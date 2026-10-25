@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Stack, router, useLocalSearchParams } from 'expo-router'
 import * as Haptics from 'expo-haptics'
 import { Plus, Search, X } from 'lucide-react-native'
@@ -58,7 +58,7 @@ export default function NewLog() {
           )
         }}
       />
-      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior="padding" keyboardVerticalOffset={90}>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
           {session && (
             <Text style={{ fontFamily: font.body, fontSize: 13, color: c.muted, marginBottom: 14 }}>

@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react'
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { Stack, router, useLocalSearchParams } from 'expo-router'
 import * as Haptics from 'expo-haptics'
 import { Copy, Moon, Plus, Snowflake, Sparkles, Sun, Thermometer, Trash2, X } from 'lucide-react-native'
@@ -102,7 +102,7 @@ export default function EditTest() {
           )
         }}
       />
-      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior="padding" keyboardVerticalOffset={90}>
         <ScrollView ref={scroll} contentContainerStyle={{ padding: 16, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
           <Text style={[styles.eyebrow, { color: c.muted }]}>Live preview</Text>
           <TestCard test={t} dep={dep(t.departmentId)} conOf={con} />

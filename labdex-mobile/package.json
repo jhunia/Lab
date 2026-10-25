@@ -45,7 +45,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "sync-shared": "node scripts/sync-shared.js",
-    "build:apk": "npm run sync-shared && npx eas-cli@latest build --platform android --profile preview"
+    "build:apk": "npm run sync-shared && npx eas-cli@latest build --platform android --profile preview",
+    "build:web": "expo export --platform web && node scripts/web-postbuild.js"
   },
   "private": true
 }

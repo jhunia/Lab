@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Stack, router, useLocalSearchParams } from 'expo-router'
 import * as Haptics from 'expo-haptics'
 import { AlertTriangle, ChevronRight, Clock, CloudUpload, Plus } from 'lucide-react-native'
@@ -50,7 +50,7 @@ export default function LogDetail() {
   return (
     <>
       <Stack.Screen options={{ title: '' }} />
-      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior="padding" keyboardVerticalOffset={90}>
         <ScrollView contentContainerStyle={{ paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
           {/* The specimen label */}
           <View style={[styles.label, { backgroundColor: c.surface, borderColor: c.ink }]}>

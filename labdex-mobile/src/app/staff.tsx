@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Haptics from 'expo-haptics'
@@ -167,7 +167,7 @@ function StaffSheet({ initial, isNew, first, onClose }: { initial: StaffInput; i
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={{ flex: 1, backgroundColor: 'rgba(8,11,16,0.45)' }} onPress={onClose} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView behavior="padding">
         <View style={[styles.sheet, { backgroundColor: c.surface, paddingBottom: insets.bottom + 16 }]}>
           <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 600 }}>
             <Text style={{ fontFamily: font.display, fontSize: 19, color: c.ink, marginBottom: 14 }}>{first ? 'Add yourself (first Senior)' : isNew ? 'Add staff member' : `Edit ${initial.name}`}</Text>

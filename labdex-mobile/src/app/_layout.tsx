@@ -1,6 +1,7 @@
+import type { ReactNode } from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { View } from 'react-native'
+import { Platform, View, useWindowDimensions } from 'react-native'
 import { useFonts } from 'expo-font'
 import { BarlowCondensed_500Medium } from '@expo-google-fonts/barlow-condensed/500Medium'
 import { BarlowCondensed_600SemiBold } from '@expo-google-fonts/barlow-condensed/600SemiBold'
@@ -24,7 +25,7 @@ function Navigator() {
   const { ready } = useData()
   if (!ready) return <View style={{ flex: 1, backgroundColor: c.bg }} />
   return (
-    <>
+    <WebFrame>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
@@ -45,7 +46,20 @@ function Navigator() {
         <Stack.Screen name="log/[id]" options={{ title: '' }} />
         <Stack.Screen name="log/scan" options={{ presentation: 'fullScreenModal', headerShown: false }} />
       </Stack>
-    </>
+    </WebFrame>
+  )
+}
+
+/** In a wide browser window keep the app phone-width and centred instead of stretched edge to edge. */
+function WebFrame({ children }: { children: ReactNode }) {
+  const { c } = useTheme()
+  const { width } = useWindowDimensions()
+  if (Platform.OS !== 'web') return <>{children}</>
+  const framed = width > 560
+  return (
+    <View style={{ flex: 1, backgroundColor: c.surface3, alignItems: 'center' }}>
+      <View style={{ flex: 1, width: '100%', maxWidth: 560, overflow: 'hidden', backgroundColor: c.bg, borderLeftWidth: framed ? 1 : 0, borderRightWidth: framed ? 1 : 0, borderColor: c.line }}>{children}</View>
+    </View>
   )
 }
 

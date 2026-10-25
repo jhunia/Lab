@@ -9,7 +9,7 @@ export function PinPrompt({ title, message, onSubmit, onCancel }: { title: strin
   const [pin, setPin] = useState('')
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
-      <KeyboardAvoidingView style={styles.scrim} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.scrim} behavior="padding">
         <View style={[styles.box, { backgroundColor: c.surface, borderColor: c.line }]}>
           <Text style={{ fontFamily: font.display, fontSize: 18, color: c.ink }}>{title}</Text>
           <Text style={{ fontFamily: font.body, fontSize: 14, lineHeight: 20, color: c.ink2 }}>{message}</Text>

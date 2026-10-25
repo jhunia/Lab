@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Stack, router } from 'expo-router'
 import { CameraView, useCameraPermissions } from 'expo-camera'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Haptics from 'expo-haptics'
 import { Keyboard, X } from 'lucide-react-native'
 import { useData } from '@/lib/data'
@@ -11,6 +12,7 @@ import { Button } from '@/components/ui'
 /** Scan the lab-number barcode on a request form. Opens the sample if it's already logged. */
 export default function ScanLabNumber() {
   const { c } = useTheme()
+  const insets = useSafeAreaInsets()
   const { logs } = useData()
   const [perm, requestPerm] = useCameraPermissions()
   const [torch, setTorch] = useState(false)
@@ -64,7 +66,7 @@ export default function ScanLabNumber() {
               </View>
               <Text style={styles.hint}>Point at the lab-number barcode</Text>
             </View>
-            <View style={styles.bottom}>
+            <View style={[styles.bottom, { bottom: insets.bottom + 32 }]}>
               <Pressable onPress={() => setTorch((t) => !t)} style={[styles.pill, torch && { backgroundColor: '#F4F1E8' }]}>
                 <Text style={{ fontFamily: font.displaySemi, fontSize: 15, letterSpacing: 1, color: torch ? '#1B1A17' : '#F4F1E8' }}>{torch ? 'LIGHT ON' : 'LIGHT'}</Text>
               </Pressable>
@@ -76,7 +78,7 @@ export default function ScanLabNumber() {
           </>
         )}
 
-        <Pressable onPress={() => router.back()} style={styles.close} accessibilityLabel="Close scanner" hitSlop={10}>
+        <Pressable onPress={() => router.back()} style={[styles.close, { top: insets.top + 12 }]} accessibilityLabel="Close scanner" hitSlop={10}>
           <X size={22} color={perm?.granted ? '#F4F1E8' : c.ink} />
         </Pressable>
       </View>
@@ -96,7 +98,7 @@ const styles = StyleSheet.create({
   frame: { width: '78%', height: 150, borderWidth: 1, borderColor: 'rgba(244,241,232,0.35)' },
   corner: { position: 'absolute', width: 28, height: 28, borderColor: '#F4F1E8' },
   hint: { fontFamily: font.displaySemi, fontSize: 17, letterSpacing: 1, color: '#F4F1E8' },
-  bottom: { position: 'absolute', bottom: 48, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 12 },
+  bottom: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 12 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 44, paddingHorizontal: 18, borderRadius: 22, borderWidth: 1.5, borderColor: '#F4F1E8' },
-  close: { position: 'absolute', top: 56, right: 20, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }
+  close: { position: 'absolute', right: 20, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }
 })
