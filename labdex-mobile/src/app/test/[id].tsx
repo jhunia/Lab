@@ -7,6 +7,7 @@ import { STORAGE_LABELS, formatDuration, type HistoryEntry, type Specimen } from
 import { fmtNum, relTime, specimenSummary } from '@shared/helpers'
 import { printTest } from '@/lib/print'
 import { useRequireStaff } from '@/lib/identity'
+import { useSeniorMode } from '@/lib/senior'
 import { errMsg, useData } from '@/lib/data'
 import { font, useTheme } from '@/lib/theme'
 import { Barcode, ContainerChip, StorageBadge, TatBar, TubeIcon, TubeStack } from '@/components/Visuals'
@@ -26,8 +27,10 @@ export default function TestDetail() {
   const { c } = useTheme()
   const { tests, dep, con, core, mutate } = useData()
   const requireStaff = useRequireStaff()
-  const canEdit = true
-  const [tab, setTab] = useState<'details' | 'history'>('details')
+  // Techs get the reference card only; editing tools and version history appear while a Senior is confirmed.
+  const canEdit = useSeniorMode().on
+  const [pickedTab, setTab] = useState<'details' | 'history'>('details')
+  const tab = canEdit ? pickedTab : 'details'
   const [deleting, setDeleting] = useState(false)
   const t = tests.find((x) => x.id === id)
 
@@ -95,7 +98,7 @@ export default function TestDetail() {
               <Text style={{ fontFamily: font.monoSemi, fontSize: 13, letterSpacing: 0.6, color: c.ink }}>{t.code}</Text>
               <Barcode value={t.code} />
             </View>
-            <StatusPill status={t.status} />
+            {canEdit && <StatusPill status={t.status} />}
           </View>
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={{ flex: 1 }}>
@@ -129,14 +132,16 @@ export default function TestDetail() {
           )}
         </View>
 
-        <Segmented
-          value={tab}
-          onChange={setTab}
-          options={[
-            { v: 'details', label: 'Details' },
-            { v: 'history', label: `History · v${t.version}` }
-          ]}
-        />
+        {canEdit && (
+          <Segmented
+            value={tab}
+            onChange={setTab}
+            options={[
+              { v: 'details', label: 'Details' },
+              { v: 'history', label: `History · v${t.version}` }
+            ]}
+          />
+        )}
 
         {tab === 'details' ? (
           <View style={{ gap: 22 }}>

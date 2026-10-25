@@ -7,6 +7,7 @@ import { ChevronRight, KeyRound, Phone, Plus, ShieldCheck } from 'lucide-react-n
 import { ROLE_HINT, ROLE_LABEL, pinError, type Staff, type StaffInput, type StaffRole } from '@shared/staff'
 import { errMsg, useData } from '@/lib/data'
 import { useRequireStaff } from '@/lib/identity'
+import { useSeniorMode } from '@/lib/senior'
 import { font, useTheme, type Colors } from '@/lib/theme'
 import { Button, Card, Field, Input, SectionTitle, Segmented } from '@/components/ui'
 import { PinPrompt } from '@/components/PinPrompt'
@@ -19,10 +20,12 @@ export default function StaffScreen() {
   const { c } = useTheme()
   const { staff, cloud, changeOwnPin } = useData()
   const requireStaff = useRequireStaff()
+  // Techs come here only to change their own PIN: no phone numbers, no adding or editing staff.
+  const manage = useSeniorMode().on
   const [editing, setEditing] = useState<{ input: StaffInput; isNew: boolean } | null>(null)
   const [pinFlow, setPinFlow] = useState<{ s: Staff; step: 'old' | 'new'; old?: string } | null>(null)
   const empty = staff.length === 0
-  const sorted = [...staff].sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name))
+  const sorted = [...staff].filter((s) => manage || s.active).sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name))
 
   const open = async (input: StaffInput, isNew: boolean) => {
     if (!empty && !(await requireStaff('SENIOR', isNew ? 'add staff' : 'edit staff details'))) return
@@ -31,7 +34,7 @@ export default function StaffScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Staff' }} />
+      <Stack.Screen options={{ title: manage ? 'Staff' : 'Change my PIN' }} />
       <ScrollView style={{ flex: 1, backgroundColor: c.bg }} contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 22 }}>
         {empty ? (
           <Card style={{ padding: 16, gap: 10, borderColor: c.accent, borderStyle: 'dashed', borderWidth: 1.5 }}>
@@ -47,14 +50,18 @@ export default function StaffScreen() {
           </Card>
         ) : (
           <View>
-            <SectionTitle>{`${staff.filter((s) => s.active).length} active staff`}</SectionTitle>
+            {manage ? (
+              <SectionTitle>{`${staff.filter((s) => s.active).length} active staff`}</SectionTitle>
+            ) : (
+              <Text style={{ fontFamily: font.body, fontSize: 14, lineHeight: 20, color: c.ink2, marginBottom: 12 }}>Tap your name, then enter your current PIN and a new one.</Text>
+            )}
             <Card>
               {sorted.map((s, i) => {
                 const rc = roleColors(c, s.role)
                 return (
                   <Pressable
                     key={s.id}
-                    onPress={() => open({ id: s.id, staffNumber: s.staffNumber, name: s.name, phone: s.phone, role: s.role, active: s.active }, false)}
+                    onPress={() => (manage ? open({ id: s.id, staffNumber: s.staffNumber, name: s.name, phone: s.phone, role: s.role, active: s.active }, false) : setPinFlow({ s, step: 'old' }))}
                     style={({ pressed }) => [styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }, pressed && { backgroundColor: c.surface3 }, !s.active && { opacity: 0.5 }]}
                   >
                     <View style={[styles.avatar, { backgroundColor: c.ink }]}>
@@ -67,7 +74,7 @@ export default function StaffScreen() {
                         <View style={{ backgroundColor: rc.bg, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 }}>
                           <Text style={{ fontFamily: font.bodySemi, fontSize: 10.5, color: rc.fg }}>{ROLE_LABEL[s.role]}</Text>
                         </View>
-                        {s.phone ? (
+                        {manage && s.phone ? (
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                             <Phone size={11} color={c.muted} />
                             <Text style={{ fontFamily: font.body, fontSize: 11.5, color: c.muted }}>{s.phone}</Text>
@@ -78,34 +85,36 @@ export default function StaffScreen() {
                     <Pressable onPress={() => setPinFlow({ s, step: 'old' })} hitSlop={8} style={{ padding: 6 }} accessibilityLabel={`Change PIN for ${s.name}`}>
                       <KeyRound size={17} color={c.muted} />
                     </Pressable>
-                    <ChevronRight size={17} color={c.muted} />
+                    {manage && <ChevronRight size={17} color={c.muted} />}
                   </Pressable>
                 )
               })}
             </Card>
-            <Button small icon={Plus} label="Add staff" style={{ alignSelf: 'flex-start', marginTop: 10 }} onPress={() => open({ staffNumber: '', name: '', phone: '', role: 'TECH', active: true }, true)} />
+            {manage && <Button small icon={Plus} label="Add staff" style={{ alignSelf: 'flex-start', marginTop: 10 }} onPress={() => open({ staffNumber: '', name: '', phone: '', role: 'TECH', active: true }, true)} />}
           </View>
         )}
 
-        <View>
-          <SectionTitle>Roles</SectionTitle>
-          <Card style={{ padding: 14, gap: 10 }}>
-            {ROLES.map((r) => {
-              const rc = roleColors(c, r)
-              return (
-                <View key={r} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={{ backgroundColor: rc.bg, borderRadius: 5, paddingHorizontal: 8, paddingVertical: 2, minWidth: 70, alignItems: 'center' }}>
-                    <Text style={{ fontFamily: font.bodySemi, fontSize: 12, color: rc.fg }}>{ROLE_LABEL[r]}</Text>
+        {manage && (
+          <View>
+            <SectionTitle>Roles</SectionTitle>
+            <Card style={{ padding: 14, gap: 10 }}>
+              {ROLES.map((r) => {
+                const rc = roleColors(c, r)
+                return (
+                  <View key={r} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{ backgroundColor: rc.bg, borderRadius: 5, paddingHorizontal: 8, paddingVertical: 2, minWidth: 70, alignItems: 'center' }}>
+                      <Text style={{ fontFamily: font.bodySemi, fontSize: 12, color: rc.fg }}>{ROLE_LABEL[r]}</Text>
+                    </View>
+                    <Text style={{ flex: 1, fontFamily: font.body, fontSize: 13, color: c.ink2 }}>{ROLE_HINT[r]}</Text>
                   </View>
-                  <Text style={{ flex: 1, fontFamily: font.body, fontSize: 13, color: c.ink2 }}>{ROLE_HINT[r]}</Text>
-                </View>
-              )
-            })}
-          </Card>
-          <Text style={{ fontFamily: font.body, fontSize: 12.5, lineHeight: 18, color: c.muted, marginTop: 8 }}>
-            No accounts or emails: each person confirms with their staff number and a personal PIN. Tap the key icon to change your own PIN.
-          </Text>
-        </View>
+                )
+              })}
+            </Card>
+            <Text style={{ fontFamily: font.body, fontSize: 12.5, lineHeight: 18, color: c.muted, marginTop: 8 }}>
+              No accounts or emails: each person confirms with their staff number and a personal PIN. Tap the key icon to change your own PIN.
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
       {editing && <StaffSheet initial={editing.input} isNew={editing.isNew} first={empty} onClose={() => setEditing(null)} />}

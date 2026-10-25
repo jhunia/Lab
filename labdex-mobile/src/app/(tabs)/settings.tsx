@@ -7,12 +7,13 @@ import * as DocumentPicker from 'expo-document-picker'
 import * as Haptics from 'expo-haptics'
 import * as Sharing from 'expo-sharing'
 import { File, Paths } from 'expo-file-system'
-import { CheckCircle2, ChevronRight, Cloud, CloudOff, Download, FileUp, Monitor, Moon, RefreshCcw, RefreshCw, Send, SlidersHorizontal, Sun, Upload, UsersRound } from 'lucide-react-native'
+import { CheckCircle2, ChevronRight, KeyRound, ShieldCheck, Cloud, CloudOff, Download, FileUp, Monitor, Moon, RefreshCcw, RefreshCw, Send, SlidersHorizontal, Sun, Upload, UsersRound } from 'lucide-react-native'
 import { importCsv, toCsv } from '@shared/csv'
 import { relTime } from '@shared/helpers'
 import { BUILT_IN_CLOUD } from '@shared/cloud-config'
 import { errMsg, useData } from '@/lib/data'
 import { useRequireStaff } from '@/lib/identity'
+import { useSeniorMode } from '@/lib/senior'
 import { font, useTheme, type ThemePref } from '@/lib/theme'
 import { Button, Card, Input, SectionTitle, Segmented } from '@/components/ui'
 import { SessionChip } from '@/components/SessionChip'
@@ -22,6 +23,7 @@ export default function Settings() {
   const insets = useSafeAreaInsets()
   const d = useData()
   const requireStaff = useRequireStaff()
+  const senior = useSeniorMode()
   const { tests, staff, core, mutate, resetToSample, sync, update, checking, revision, cloud } = d
   const [feed, setFeed] = useState(sync.feedUrl)
   const [url, setUrl] = useState(sync.cloudUrl)
@@ -181,9 +183,11 @@ export default function Settings() {
               )}
               <Button small icon={RefreshCw} label="Sync now" onPress={() => void d.teamSync()} />
               {!onLabCloud && <Button small icon={Cloud} label={connecting ? 'Connecting…' : 'Switch back to the lab cloud'} disabled={connecting} onPress={reconnect} />}
-              <Pressable onPress={pause} hitSlop={8} style={{ alignSelf: 'center' }}>
-                <Text style={{ fontFamily: font.body, fontSize: 12.5, color: c.muted, textDecorationLine: 'underline' }}>Pause cloud on this phone (Senior)</Text>
-              </Pressable>
+              {senior.on && (
+                <Pressable onPress={pause} hitSlop={8} style={{ alignSelf: 'center' }}>
+                  <Text style={{ fontFamily: font.body, fontSize: 12.5, color: c.muted, textDecorationLine: 'underline' }}>Pause cloud on this phone</Text>
+                </Pressable>
+              )}
             </>
           ) : (
             <>
@@ -193,10 +197,12 @@ export default function Settings() {
               <Button icon={Cloud} variant="primary" label={connecting ? 'Connecting…' : 'Reconnect to the lab cloud'} disabled={connecting} onPress={reconnect} />
             </>
           )}
-          <Pressable onPress={() => setOtherCloud((v) => !v)} hitSlop={8} style={{ alignSelf: 'center' }}>
-            <Text style={{ fontFamily: font.body, fontSize: 12, color: c.muted }}>{otherCloud ? 'Hide' : 'Use a different cloud project (Senior)…'}</Text>
-          </Pressable>
-          {otherCloud && (
+          {senior.on && (
+            <Pressable onPress={() => setOtherCloud((v) => !v)} hitSlop={8} style={{ alignSelf: 'center' }}>
+              <Text style={{ fontFamily: font.body, fontSize: 12, color: c.muted }}>{otherCloud ? 'Hide' : 'Use a different cloud project…'}</Text>
+            </Pressable>
+          )}
+          {senior.on && otherCloud && (
             <View style={{ gap: 8, paddingTop: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }}>
               <Text style={{ fontFamily: font.body, fontSize: 12.5, lineHeight: 18, color: c.muted }}>
                 Only for moving to a new Supabase project. Use its Project URL and anon key (Project Settings → API) — never the secret key.
@@ -209,70 +215,96 @@ export default function Settings() {
         </Card>
       </View>
 
-      <View>
-        <SectionTitle>Team</SectionTitle>
-        <Card>
-          <Row icon={<UsersRound size={17} color={c.ink2} />} label="Staff" detail={staff.length ? `${staff.filter((s) => s.active).length} active` : 'Set up'} onPress={() => router.push('/staff')} last />
-        </Card>
-      </View>
-
-      <View>
-        <SectionTitle>Test updates</SectionTitle>
-        <Card style={{ padding: 14, gap: 12 }}>
-          {cloud.connected ? (
-            <Text style={{ fontFamily: font.body, fontSize: 13.5, lineHeight: 19, color: c.ink2 }}>Published test changes arrive from the cloud automatically — you’ll get “Update available” and a notification.</Text>
-          ) : (
-            <>
-              <Text style={{ fontFamily: font.body, fontSize: 13.5, lineHeight: 19, color: c.ink2 }}>No cloud yet? Paste the share link of a published update file (OneDrive, Google Drive, Dropbox…).</Text>
-              <Input value={feed} onChangeText={setFeed} placeholder="https://…" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
-              <Button small label="Save link" disabled={feed.trim() === sync.feedUrl} onPress={() => void d.setFeedUrl(feed).then(check)} />
-            </>
-          )}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Button small icon={RefreshCw} label={checking ? 'Checking…' : 'Check now'} disabled={(!cloud.connected && !sync.feedUrl) || checking} onPress={check} />
-            <Text style={{ flex: 1, fontFamily: font.mono, fontSize: 11, color: c.muted }}>
-              {revision ? `Tests from ${new Date(revision).toLocaleString()}` : 'Local tests only'}
-              {sync.lastCheckedAt ? ` · checked ${relTime(sync.lastCheckedAt)}` : ''}
-            </Text>
-          </View>
-          {update?.error ? <Text style={{ fontFamily: font.body, fontSize: 13, color: c.danger }}>{update.error}</Text> : null}
-          {update?.available && (
-            <View style={[styles.callout, { backgroundColor: c.accentSoft, borderColor: c.accent }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: font.bodySemi, fontSize: 14, color: c.ink }}>New update from {update.publishedBy}</Text>
-                <Text style={{ fontFamily: font.body, fontSize: 12.5, color: c.ink2 }}>{update.publishedAt ? `Published ${relTime(update.publishedAt)}` : ''}</Text>
-              </View>
-              <Button small variant="primary" icon={Download} label="Sync now" onPress={syncNow} />
+      {/* Techs only see test updates when there is one to take (or no cloud to bring them automatically). */}
+      {(senior.on || update?.available || !cloud.connected) && (
+        <View>
+          <SectionTitle>Test updates</SectionTitle>
+          <Card style={{ padding: 14, gap: 12 }}>
+            {cloud.connected ? (
+              <Text style={{ fontFamily: font.body, fontSize: 13.5, lineHeight: 19, color: c.ink2 }}>Published test changes arrive from the cloud automatically — you’ll get “Update available” and a notification.</Text>
+            ) : (
+              senior.on && (
+                <>
+                  <Text style={{ fontFamily: font.body, fontSize: 13.5, lineHeight: 19, color: c.ink2 }}>No cloud yet? Paste the share link of a published update file (OneDrive, Google Drive, Dropbox…).</Text>
+                  <Input value={feed} onChangeText={setFeed} placeholder="https://…" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
+                  <Button small label="Save link" disabled={feed.trim() === sync.feedUrl} onPress={() => void d.setFeedUrl(feed).then(check)} />
+                </>
+              )
+            )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Button small icon={RefreshCw} label={checking ? 'Checking…' : 'Check now'} disabled={(!cloud.connected && !sync.feedUrl) || checking} onPress={check} />
+              <Text style={{ flex: 1, fontFamily: font.mono, fontSize: 11, color: c.muted }}>
+                {revision ? `Tests from ${new Date(revision).toLocaleString()}` : 'Local tests only'}
+                {sync.lastCheckedAt ? ` · checked ${relTime(sync.lastCheckedAt)}` : ''}
+              </Text>
             </View>
-          )}
-          {!cloud.connected && (
-            <Button
-              small
-              variant="ghost"
-              icon={FileUp}
-              label="Open an update file…"
-              onPress={() =>
-                d
-                  .openUpdateFile()
-                  .then((r) => r && ok('Update applied', `${r.tests} tests`))
-                  .catch((e) => fail('Could not open update', e))
-              }
-              style={{ alignSelf: 'flex-start', marginLeft: -12 }}
-            />
-          )}
-        </Card>
-      </View>
+            {update?.error ? <Text style={{ fontFamily: font.body, fontSize: 13, color: c.danger }}>{update.error}</Text> : null}
+            {update?.available && (
+              <View style={[styles.callout, { backgroundColor: c.accentSoft, borderColor: c.accent }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: font.bodySemi, fontSize: 14, color: c.ink }}>New update from {update.publishedBy}</Text>
+                  <Text style={{ fontFamily: font.body, fontSize: 12.5, color: c.ink2 }}>{update.publishedAt ? `Published ${relTime(update.publishedAt)}` : ''}</Text>
+                </View>
+                <Button small variant="primary" icon={Download} label="Sync now" onPress={syncNow} />
+              </View>
+            )}
+            {!cloud.connected && (
+              <Button
+                small
+                variant="ghost"
+                icon={FileUp}
+                label="Open an update file…"
+                onPress={() =>
+                  d
+                    .openUpdateFile()
+                    .then((r) => r && ok('Update applied', `${r.tests} tests`))
+                    .catch((e) => fail('Could not open update', e))
+                }
+                style={{ alignSelf: 'flex-start', marginLeft: -12 }}
+              />
+            )}
+          </Card>
+        </View>
+      )}
 
-      <View>
-        <SectionTitle>Publish test changes (Seniors)</SectionTitle>
-        <Card style={{ padding: 14, gap: 10 }}>
-          <Text style={{ fontFamily: font.body, fontSize: 13.5, lineHeight: 19, color: c.ink2 }}>
-            {cloud.connected ? 'After editing tests, publish so every device gets them.' : 'Creates an update file and opens the share menu — save it over the same file in your shared folder, or send it directly.'}
-          </Text>
-          <Input placeholder="Name shown to staff (optional)" value={publisher} onChangeText={setPublisher} />
-          <Button icon={Send} variant="primary" label="Publish update" onPress={publish} />
-        </Card>
-      </View>
+      {senior.on ? (
+        <>
+          <View>
+            <SectionTitle>Team</SectionTitle>
+            <Card>
+              <Row icon={<UsersRound size={17} color={c.ink2} />} label="Staff" detail={staff.length ? `${staff.filter((s) => s.active).length} active` : 'Set up'} onPress={() => router.push('/staff')} last />
+            </Card>
+          </View>
+
+          <View>
+            <SectionTitle>Publish test changes</SectionTitle>
+            <Card style={{ padding: 14, gap: 10 }}>
+              <Text style={{ fontFamily: font.body, fontSize: 13.5, lineHeight: 19, color: c.ink2 }}>
+                {cloud.connected ? 'After editing tests, publish so every device gets them.' : 'Creates an update file and opens the share menu — save it over the same file in your shared folder, or send it directly.'}
+              </Text>
+              <Input placeholder="Name shown to staff (optional)" value={publisher} onChangeText={setPublisher} />
+              <Button icon={Send} variant="primary" label="Publish update" onPress={publish} />
+            </Card>
+          </View>
+
+          <View>
+            <SectionTitle>Data</SectionTitle>
+            <Card>
+              <Row icon={<SlidersHorizontal size={17} color={c.ink2} />} label="Containers & departments" onPress={() => router.push('/lookups')} />
+              <Row icon={<Upload size={17} color={c.ink2} />} label="Import CSV" onPress={importFile} />
+              <Row icon={<Download size={17} color={c.ink2} />} label="Export CSV" onPress={exportCsv} />
+              <Row icon={<RefreshCcw size={17} color={c.danger} />} label="Reset tests to sample data" danger onPress={reset} last />
+            </Card>
+          </View>
+        </>
+      ) : (
+        <View>
+          <SectionTitle>You</SectionTitle>
+          <Card>
+            <Row icon={<KeyRound size={17} color={c.ink2} />} label="Change my PIN" onPress={() => router.push('/staff')} last />
+          </Card>
+        </View>
+      )}
 
       <View>
         <SectionTitle>Appearance</SectionTitle>
@@ -287,15 +319,20 @@ export default function Settings() {
         />
       </View>
 
-      <View>
-        <SectionTitle>Data</SectionTitle>
-        <Card>
-          <Row icon={<SlidersHorizontal size={17} color={c.ink2} />} label="Containers & departments" onPress={() => router.push('/lookups')} />
-          <Row icon={<Upload size={17} color={c.ink2} />} label="Import CSV" onPress={importFile} />
-          <Row icon={<Download size={17} color={c.ink2} />} label="Export CSV" onPress={exportCsv} />
-          <Row icon={<RefreshCcw size={17} color={c.danger} />} label="Reset tests to sample data" danger onPress={reset} last />
-        </Card>
-      </View>
+      {!senior.on && (
+        <Pressable
+          onPress={() => void senior.unlock()}
+          style={({ pressed }) => [styles.gate, { borderColor: c.lineStrong }, pressed && { backgroundColor: c.surface3 }]}
+          accessibilityRole="button"
+        >
+          <ShieldCheck size={18} color={c.ink2} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: font.bodySemi, fontSize: 14.5, color: c.ink }}>Senior tools</Text>
+            <Text style={{ fontFamily: font.body, fontSize: 12.5, color: c.muted }}>Edit tests, manage staff, publish updates</Text>
+          </View>
+          <ChevronRight size={17} color={c.muted} />
+        </Pressable>
+      )}
 
       <Text style={{ fontFamily: font.mono, fontSize: 11, color: c.muted, textAlign: 'center' }}>LabDex mobile · {tests.length} tests</Text>
     </ScrollView>
@@ -316,5 +353,6 @@ function Row({ icon, label, detail, onPress, danger, last }: { icon: ReactNode; 
 
 const styles = StyleSheet.create({
   callout: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, borderWidth: 1 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 }
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
+  gate: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderWidth: 1, borderStyle: 'dashed', borderRadius: 4 }
 })

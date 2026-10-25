@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -13,6 +13,7 @@ import { OptionSheet } from '@/components/OptionSheet'
 import { UpdateBanner } from '@/components/UpdateBanner'
 import { SessionChip } from '@/components/SessionChip'
 import { useRequireStaff } from '@/lib/identity'
+import { useSeniorMode } from '@/lib/senior'
 
 type Scope = 'active' | 'DRAFT' | 'ARCHIVED'
 type Sort = 'name' | 'code' | 'tat' | 'updated'
@@ -24,9 +25,14 @@ export default function Directory() {
   const insets = useSafeAreaInsets()
   const { tests, departments, containers, dep, con, search } = useData()
   const requireStaff = useRequireStaff()
+  const senior = useSeniorMode()
   const [q, setQ] = useState('')
   const [depId, setDepId] = useState<string | null>(null)
   const [scope, setScope] = useState<Scope>('active')
+  // Drafts and archived tests are a Senior's workspace; when the Senior locks the phone, go back to the live list.
+  useEffect(() => {
+    if (!senior.on) setScope('active')
+  }, [senior.on])
   const [temp, setTemp] = useState<StorageTemp | null>(null)
   const [containerId, setContainerId] = useState('')
   const [sort, setSort] = useState<Sort>('name')
@@ -74,7 +80,7 @@ export default function Directory() {
 
       <UpdateBanner />
 
-      {!filtering && (
+      {!filtering && senior.on && (
         <View style={styles.readouts}>
           {[
             ['Active', active.length, null],
@@ -117,9 +123,13 @@ export default function Directory() {
         {departments.map((d) => (
           <Chip key={d.id} label={d.name} color={d.color} active={scope === 'active' && depId === d.id} onPress={() => (setScope('active'), setDepId(depId === d.id ? null : d.id))} />
         ))}
-        <View style={{ width: 1, backgroundColor: c.lineStrong, marginHorizontal: 4 }} />
-        <Chip label={`Drafts · ${counts.drafts}`} active={scope === 'DRAFT'} onPress={() => (setDepId(null), setScope(scope === 'DRAFT' ? 'active' : 'DRAFT'))} />
-        <Chip label={`Archived · ${counts.archived}`} active={scope === 'ARCHIVED'} onPress={() => (setDepId(null), setScope(scope === 'ARCHIVED' ? 'active' : 'ARCHIVED'))} />
+        {senior.on && (
+          <>
+            <View style={{ width: 1, backgroundColor: c.lineStrong, marginHorizontal: 4 }} />
+            <Chip label={`Drafts · ${counts.drafts}`} active={scope === 'DRAFT'} onPress={() => (setDepId(null), setScope(scope === 'DRAFT' ? 'active' : 'DRAFT'))} />
+            <Chip label={`Archived · ${counts.archived}`} active={scope === 'ARCHIVED'} onPress={() => (setDepId(null), setScope(scope === 'ARCHIVED' ? 'active' : 'ARCHIVED'))} />
+          </>
+        )}
       </ScrollView>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
@@ -165,11 +175,11 @@ export default function Directory() {
           <View style={styles.empty}>
             <FlaskConical size={36} color={c.muted} strokeWidth={1.4} />
             <Text style={{ fontFamily: font.display, fontSize: 17, color: c.ink }}>{q ? `Nothing matches “${q}”` : 'No tests here'}</Text>
-            <Text style={{ fontFamily: font.body, color: c.muted, textAlign: 'center' }}>{q ? 'Try a code, abbreviation or synonym.' : 'Tap + to add a test, or sync from Settings to get the lab’s tests.'}</Text>
+            <Text style={{ fontFamily: font.body, color: c.muted, textAlign: 'center' }}>{q ? 'Try a code, abbreviation or synonym.' : senior.on ? 'Tap + to add a test, or publish from Settings.' : 'No tests yet — a Senior publishes them from Settings.'}</Text>
           </View>
         }
       />
-      {(
+      {senior.on && (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="New test"
