@@ -15,6 +15,19 @@
         "--clear"
       ],
       "port": 8081
+    },
+    {
+      "name": "labdex-web-dist",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "-y",
+        "serve@14.2.4",
+        "-s",
+        "labdex-mobile/dist",
+        "-l",
+        "5050"
+      ],
+      "port": 5050
     }
   ]
 }

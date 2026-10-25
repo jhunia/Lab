@@ -14,6 +14,7 @@ import { IBMPlexMono_600SemiBold } from '@expo-google-fonts/ibm-plex-mono/600Sem
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 // Defines the background update-check task; must load before the app renders.
 import '@/lib/background'
+import '@/lib/web-alert'
 import { DataProvider, useData } from '@/lib/data'
 import { IdentityProvider } from '@/lib/identity'
 import { ThemeProvider, font, useTheme } from '@/lib/theme'
