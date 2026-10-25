@@ -80,7 +80,8 @@ export class CloudClient {
 
   constructor(
     private readonly cfg: CloudConfig,
-    private readonly fetchImpl: Fetch = fetch as unknown as Fetch,
+    // Wrapped so fetch is never called with `this` set to the client (browsers throw "Illegal invocation").
+    private readonly fetchImpl: Fetch = ((url, init) => fetch(url, init)) as Fetch,
     private readonly timeoutMs = 20000
   ) {
     this.base = cfg.url.trim().replace(/\/+$/, '')

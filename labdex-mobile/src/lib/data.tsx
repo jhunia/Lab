@@ -395,7 +395,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const err = cloudConfigError(cfg)
         if (err) throw new Error(err)
         const r = await new CloudClient(cfg).ping()
-        const next = { ...syncRef.current, cloudUrl: cfg.url.trim().replace(/\/+$/, ''), cloudKey: cfg.anonKey.trim() }
+        const next = { ...syncRef.current, cloudUrl: cfg.url.trim().replace(/\/+$/, ''), cloudKey: cfg.anonKey.trim(), cloudDisconnected: false }
         saveSync(next)
         makeCloud(next)
         setSess(null)
@@ -403,7 +403,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         await teamSync()
         return r
       }
-      const next = { ...syncRef.current, cloudUrl: '', cloudKey: '' }
+      const next = { ...syncRef.current, cloudUrl: '', cloudKey: '', cloudDisconnected: true }
       saveSync(next)
       makeCloud(next)
       setSess(null)

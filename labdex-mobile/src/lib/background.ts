@@ -10,6 +10,7 @@ import * as TaskManager from 'expo-task-manager'
 import { checkFeed, httpGetText } from '@shared/sync'
 import { CloudClient } from '@shared/cloud'
 import { DEFAULT_SYNC, type SyncSettings } from '@shared/types'
+import { withBuiltInCloud } from '@shared/cloud-config'
 
 export const DB_KEY = 'labdex.db.v1'
 export const SYNC_KEY = 'labdex.sync.v1'
@@ -20,9 +21,9 @@ const TASK = 'labdex-update-check'
 export async function loadSync(): Promise<SyncSettings> {
   try {
     const raw = await AsyncStorage.getItem(SYNC_KEY)
-    return raw ? { ...DEFAULT_SYNC, ...(JSON.parse(raw) as Partial<SyncSettings>) } : { ...DEFAULT_SYNC }
+    return withBuiltInCloud(raw ? { ...DEFAULT_SYNC, ...(JSON.parse(raw) as Partial<SyncSettings>) } : { ...DEFAULT_SYNC })
   } catch {
-    return { ...DEFAULT_SYNC }
+    return withBuiltInCloud({ ...DEFAULT_SYNC })
   }
 }
 
@@ -52,7 +53,7 @@ TaskManager.defineTask(TASK, async () => {
     const sync = await loadSync()
     const local = await localRevision(sync)
     if (sync.cloudUrl && sync.cloudKey) {
-      const rel = await new CloudClient({ url: sync.cloudUrl, anonKey: sync.cloudKey }, fetch as never).latestRelease()
+      const rel = await new CloudClient({ url: sync.cloudUrl, anonKey: sync.cloudKey }).latestRelease()
       if (rel && rel.revision > local) await notifyUpdate(rel.revision, rel.publisherName)
     } else if (sync.feedUrl) {
       const { check } = await checkFeed(sync.feedUrl, local, httpGetText)

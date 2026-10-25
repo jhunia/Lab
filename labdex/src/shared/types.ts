@@ -108,6 +108,8 @@ export interface SyncSettings {
   /** Supabase project URL + public anon key ('' = not connected). */
   cloudUrl: string
   cloudKey: string
+  /** Set when someone pressed Disconnect, so the built-in project is not re-applied. */
+  cloudDisconnected?: boolean
 }
 
 export const DEFAULT_SYNC: SyncSettings = { feedUrl: '', syncedRevision: 0, lastCheckedAt: null, cloudUrl: '', cloudKey: '' }

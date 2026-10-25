@@ -16,6 +16,7 @@ import { parsePackage, type LabCore, type UpdatePackage } from '@shared/core'
 import { importCsv, toCsv } from '@shared/csv'
 import { UPDATE_FILE_NAME, checkFeed, httpGetText } from '@shared/sync'
 import { CloudClient, cloudConfigError } from '@shared/cloud'
+import { withBuiltInCloud } from '@shared/cloud-config'
 import { LogCore, emptyLogFile, type LogFile, type SampleStatus } from '@shared/logs'
 import { PinThrottle, SESSION_MS, hasRole, type StaffInput, type StaffRole, type StaffSession } from '@shared/staff'
 import { identify, pullLogs, pushOutbox, sessionValid } from '@shared/teamsync'
@@ -45,6 +46,7 @@ function loadSync(): void {
   } catch {
     /* keep defaults */
   }
+  sync = withBuiltInCloud(sync)
 }
 const saveSync = () => writeFileSync(syncFile, JSON.stringify(sync, null, 2), 'utf8')
 
@@ -230,14 +232,14 @@ function registerIpc(): void {
       if (err) throw new Error(err)
       const probe = new CloudClient(cfg)
       const r = await probe.ping() // throws with a readable message if unreachable / not set up
-      sync = { ...sync, cloudUrl: cfg.url.trim().replace(/\/+$/, ''), cloudKey: cfg.anonKey.trim() }
+      sync = { ...sync, cloudUrl: cfg.url.trim().replace(/\/+$/, ''), cloudKey: cfg.anonKey.trim(), cloudDisconnected: false }
       saveSync()
       makeCloud()
       session = null
       await teamSync()
       return r
     }
-    sync = { ...sync, cloudUrl: '', cloudKey: '' }
+    sync = { ...sync, cloudUrl: '', cloudKey: '', cloudDisconnected: true }
     saveSync()
     makeCloud()
     session = null

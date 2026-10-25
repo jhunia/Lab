@@ -286,3 +286,4 @@ grant execute on function public.log_sample_event(text, text, jsonb, jsonb) to a
 -- Done. Next: in LabDex → Settings → Cloud, paste the Project URL and anon key.
 -- The first person to add themselves to the empty staff list becomes the first Senior.
 -- ============================================================================
+p
