@@ -1,0 +1,57 @@
+{
+  "name": "labdex",
+  "productName": "LabDex",
+  "version": "0.2.0",
+  "description": "Lab test directory and specimen guide",
+  "author": "LabDex",
+  "main": "./out/main/index.js",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dist": "electron-vite build && electron-builder --win"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^44.9.2",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^6.0.0",
+    "fuse.js": "^7.5.0",
+    "lucide-react": "^1.60.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.4"
+  },
+  "build": {
+    "appId": "app.labdex.desktop",
+    "productName": "LabDex",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "LabDex"
+    }
+  }
+}

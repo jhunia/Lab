@@ -1,0 +1,20 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "labdex-mobile-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "labdex-mobile",
+        "run",
+        "web",
+        "--",
+        "--port",
+        "8081",
+        "--clear"
+      ],
+      "port": 8081
+    }
+  ]
+}

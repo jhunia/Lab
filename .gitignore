@@ -1,0 +1,32 @@
+# Dependencies and build output
+node_modules/
+out/
+dist/
+web-build/
+release/
+*.apk
+*.aab
+*.exe
+
+# Expo / Metro
+.expo/
+.metro-health-check*
+expo-env.d.ts
+
+# Secrets and signing keys
+.env
+.env*.local
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+
+# Editor / OS / local tool settings
+.DS_Store
+Thumbs.db
+*.log
+*.tsbuildinfo
+.claude/settings.local.json
