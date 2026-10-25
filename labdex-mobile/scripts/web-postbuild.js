@@ -27,7 +27,15 @@ const head = `
       #root { height: 100vh; height: 100dvh; }
       body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
     </style>`
-html = html.replace('</head>', `${head}\n  </head>`)
+// Safari paints the status bar / toolbar in theme-color: match the paper, and the night register in dark mode.
+html = html.replace(/<meta name="theme-color"[^>]*>/, '')
+html = html.replace(
+  '</head>',
+  `${head}
+    <meta name="theme-color" content="#F4F1E8" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#151410" media="(prefers-color-scheme: dark)">
+  </head>`
+)
 fs.writeFileSync(file, html)
 
 fs.copyFileSync(path.join(__dirname, '..', 'assets', 'icon.png'), path.join(dist, 'apple-touch-icon.png'))

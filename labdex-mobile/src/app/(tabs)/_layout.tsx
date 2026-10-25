@@ -16,8 +16,10 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: c.bg },
         tabBarActiveTintColor: c.accent,
         tabBarInactiveTintColor: c.muted,
-        // Explicit height: the default clips the label on web and leaves no room for the home bar.
-        tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.line, height: 68 + insets.bottom, paddingTop: 4, paddingBottom: Math.max(insets.bottom, 8) },
+        // Explicit height (the default clips the label on web) plus the home bar / gesture bar inset.
+        tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.line, height: 62 + insets.bottom, paddingTop: 0, paddingBottom: insets.bottom },
+        // Centre icon + label in the bar instead of letting them sink to the bottom edge.
+        tabBarItemStyle: { height: 62, paddingTop: 3, paddingBottom: 0, justifyContent: 'center', gap: 3 },
         tabBarLabelStyle: { fontFamily: font.bodySemi, fontSize: 11, lineHeight: 14 }
       }}
     >
