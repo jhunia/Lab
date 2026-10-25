@@ -189,9 +189,17 @@ export class LogCore {
     this.save()
   }
 
-  /** The person re-confirmed after the cloud rejected their PIN. */
+  /** The person re-confirmed after the cloud rejected their PIN: applies to all of their waiting entries. */
   reconfirm(eventId: string, pin: string): void {
-    this.f.outbox = this.f.outbox.map((o) => (o.eventId === eventId ? { ...o, pin, needsPin: false, error: '' } : o))
+    const who = this.f.events.find((e) => e.id === eventId)?.staffNumber.toLowerCase()
+    const theirs = new Set(this.f.events.filter((e) => e.staffNumber.toLowerCase() === who).map((e) => e.id))
+    this.f.outbox = this.f.outbox.map((o) => (o.eventId === eventId || (o.needsPin && theirs.has(o.eventId)) ? { ...o, pin, needsPin: false, error: '' } : o))
+    this.save()
+  }
+
+  /** Start pulling from the beginning — used when the device switches to a different cloud project. */
+  resetPulled(): void {
+    this.f.pulledSeq = 0
     this.save()
   }
 

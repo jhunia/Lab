@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
-import { AlertTriangle, Barcode, Clock, CloudCheck, CloudOff, CloudUpload, KeyRound, Lock, NotebookPen, Plus, Search, X } from 'lucide-react-native'
+import { AlertTriangle, Barcode, Copy, CloudAlert, Clock, CloudCheck, CloudOff, CloudUpload, KeyRound, Lock, NotebookPen, Plus, Search, X } from 'lucide-react-native'
 import { sampleAlerts, type LogView, type SampleAlert } from '@shared/logs'
 import type { LabTest } from '@shared/types'
 import { relTime } from '@shared/helpers'
@@ -30,7 +30,7 @@ const CLOSED_WINDOW_MS = 12 * 3600 * 1000
 export default function Register() {
   const { c } = useTheme()
   const insets = useSafeAreaInsets()
-  const { logs, tests, con, cloud, waitingUpload, needsPin, reconfirmUpload, staff, session, lock } = useData()
+  const { logs, tests, con, cloud, waitingUpload, needsPin, uploadProblems, reconfirmUpload, staff, session, lock } = useData()
   const requireStaff = useRequireStaff()
   const [filter, setFilter] = useState<Filter>('open')
   const [searching, setSearching] = useState(false)
@@ -70,8 +70,15 @@ export default function Register() {
   const closed = shown.filter((e) => !e.v.open)
 
   const open = entries.filter((e) => e.v.open)
+  // Two phones offline can each log the same sample; flag it so someone checks.
+  const openPerLab = new Map<string, number>()
+  for (const e of open) openPerLab.set(e.v.log.labNumber.toUpperCase(), (openPerLab.get(e.v.log.labNumber.toUpperCase()) ?? 0) + 1)
+  // One warning per person, not per entry; re-confirming once covers all of their entries.
+  const byPerson = <T extends { staffNumber: string }>(xs: T[]) => [...new Map(xs.map((x) => [x.staffNumber, { ...x, count: xs.filter((y) => y.staffNumber === x.staffNumber).length }])).values()]
+  const pinGroups = byPerson(needsPin)
+  const problemGroups = byPerson(uploadProblems)
   const counts = { overdue: open.filter((e) => e.late).length, soon: open.filter((e) => e.soon).length, waiting: open.filter((e) => !e.late && !e.soon).length }
-  const waiting = waitingUpload - needsPin.length
+  const waiting = waitingUpload - needsPin.length - uploadProblems.length
 
   const needsSetup = staff.length === 0 && !cloud.connected
   const begin = async (path: '/log/new' | '/log/scan') => {
@@ -120,6 +127,12 @@ export default function Register() {
             </Text>
             {v.pendingUploads > 0 && <CloudUpload size={13} color={c.muted} />}
           </View>
+          {v.open && (openPerLab.get(v.log.labNumber.toUpperCase()) ?? 0) > 1 ? (
+            <View style={[styles.chip, { backgroundColor: c.warnBg }]}>
+              <Copy size={12} color={c.warnInk} />
+              <Text style={{ fontFamily: font.bodyMedium, fontSize: 12, color: c.warnInk }}>Logged twice — check both entries and close one</Text>
+            </View>
+          ) : null}
           {e.late ? (
             <View style={[styles.banner, { backgroundColor: c.danger }]}>
               <AlertTriangle size={14} color="#fff" />
@@ -226,13 +239,27 @@ export default function Register() {
           )}
         </View>
 
-        {needsPin.map((n) => (
-          <Pressable key={n.eventId} onPress={() => setReconfirm(n)} style={[styles.strip, { backgroundColor: c.warnBg }]}>
+        {pinGroups.map((n) => (
+          <Pressable key={n.staffNumber} onPress={() => setReconfirm(n)} style={[styles.strip, { backgroundColor: c.warnBg }]}>
             <KeyRound size={15} color={c.warnInk} />
             <Text style={{ flex: 1, fontFamily: font.body, fontSize: 12.5, color: c.warnInk }}>
-              {n.staffName}’s entry for <Text style={{ fontFamily: font.monoSemi }}>{n.labNumber}</Text> wasn’t accepted. Tap to re-confirm.
+              {n.count > 1 ? `${n.staffName}’s ${n.count} entries weren’t accepted (wrong PIN).` : (
+                <>
+                  {n.staffName}’s entry for <Text style={{ fontFamily: font.monoSemi }}>{n.labNumber}</Text> wasn’t accepted (wrong PIN).
+                </>
+              )}{' '}
+              <Text style={{ fontFamily: font.bodySemi }}>Tap to re-enter the PIN.</Text>
             </Text>
           </Pressable>
+        ))}
+        {problemGroups.map((n) => (
+          <View key={n.staffNumber} style={[styles.strip, { backgroundColor: c.dangerSoft }]}>
+            <CloudAlert size={15} color={c.danger} />
+            <Text style={{ flex: 1, fontFamily: font.body, fontSize: 12.5, color: c.ink }}>
+              {n.count > 1 ? `${n.count} entries by ${n.staffName}` : `${n.staffName}’s entry for ${n.labNumber}`} can’t upload: {n.error}.{' '}
+              {/unknown|inactive/i.test(n.error) ? 'A Senior can re-activate them in Settings → Staff.' : 'It will retry by itself.'}
+            </Text>
+          </View>
         ))}
 
         {actNow.length > 0 && (
@@ -315,7 +342,7 @@ export default function Register() {
       {reconfirm && (
         <PinPrompt
           title="Re-confirm entry"
-          message={`${reconfirm.staffName} (${reconfirm.staffNumber}), enter your current PIN so your entry for ${reconfirm.labNumber} can upload.`}
+          message={`${reconfirm.staffName} (${reconfirm.staffNumber}), enter your current PIN so your waiting entries can upload.`}
           onCancel={() => setReconfirm(null)}
           onSubmit={(pin) => {
             reconfirmUpload(reconfirm.eventId, pin)

@@ -16,7 +16,7 @@ import { parsePackage, type LabCore, type UpdatePackage } from '@shared/core'
 import { importCsv, toCsv } from '@shared/csv'
 import { UPDATE_FILE_NAME, checkFeed, httpGetText } from '@shared/sync'
 import { CloudClient, cloudConfigError } from '@shared/cloud'
-import { withBuiltInCloud } from '@shared/cloud-config'
+import { BUILT_IN_CLOUD, withBuiltInCloud } from '@shared/cloud-config'
 import { LogCore, emptyLogFile, type LogFile, type SampleStatus } from '@shared/logs'
 import { PinThrottle, SESSION_MS, hasRole, type StaffInput, type StaffRole, type StaffSession } from '@shared/staff'
 import { identify, pullLogs, pushOutbox, sessionValid } from '@shared/teamsync'
@@ -226,13 +226,16 @@ function registerIpc(): void {
   })
 
   // ---------- Cloud ----------
-  ipcMain.handle('cloud:set', async (_e, cfg: { url: string; anonKey: string } | null) => {
+  const connectCloud = async (cfg: { url: string; anonKey: string } | null) => {
     if (cfg) {
       const err = cloudConfigError(cfg)
       if (err) throw new Error(err)
       const probe = new CloudClient(cfg)
       const r = await probe.ping() // throws with a readable message if unreachable / not set up
-      sync = { ...sync, cloudUrl: cfg.url.trim().replace(/\/+$/, ''), cloudKey: cfg.anonKey.trim(), cloudDisconnected: false }
+      const cloudUrl = cfg.url.trim().replace(/\/+$/, '')
+      // A different project has its own entry numbers: read its sample log from the start.
+      if (cloudUrl !== sync.cloudUrl) logs.resetPulled()
+      sync = { ...sync, cloudUrl, cloudKey: cfg.anonKey.trim(), cloudDisconnected: false }
       saveSync()
       makeCloud()
       session = null
@@ -244,7 +247,10 @@ function registerIpc(): void {
     makeCloud()
     session = null
     return { staff: store.snapshot().staff.length }
-  })
+  }
+  // Pausing or pointing this computer at another project is a Senior's call; reconnecting to the lab's own project is open to everyone.
+  ipcMain.handle('cloud:set', senior((cfg: { url: string; anonKey: string } | null) => connectCloud(cfg)))
+  ipcMain.handle('cloud:reconnect', () => connectCloud(BUILT_IN_CLOUD))
   ipcMain.handle('cloud:sync', () => teamSync())
 
   // ---------- Sample log ----------

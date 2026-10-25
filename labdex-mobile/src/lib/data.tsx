@@ -8,6 +8,7 @@ import { LabCore, createSeedDb, parsePackage, type DbFile, type UpdatePackage } 
 import { searchTests } from '@shared/search'
 import { CHECK_INTERVAL_MS, UPDATE_FILE_NAME, checkFeed, httpGetText } from '@shared/sync'
 import { CloudClient, cloudConfigError } from '@shared/cloud'
+import { BUILT_IN_CLOUD } from '@shared/cloud-config'
 import { LogCore, emptyLogFile, type LogFile, type LogView, type SampleStatus } from '@shared/logs'
 import { PinThrottle, SESSION_MS, hasRole, type Staff, type StaffInput, type StaffRole, type StaffSession } from '@shared/staff'
 import { identify, pullLogs, pushOutbox, sessionValid } from '@shared/teamsync'
@@ -70,6 +71,10 @@ interface DataCtx extends Snapshot {
   logs: LogView[]
   waitingUpload: number
   needsPin: NeedsPin[]
+  /** Entries the cloud refused for a reason other than the PIN (e.g. the person was deactivated). */
+  uploadProblems: NeedsPin[]
+  /** Connects (back) to the lab's own cloud project — one tap, nothing to type. */
+  reconnectLabCloud: () => Promise<{ staff: number }>
   createLog: (input: { labNumber: string; tests: LabTest[]; status: SampleStatus; note: string }) => string
   addLogEvent: (logId: string, status: SampleStatus, note: string) => void
   reconfirmUpload: (eventId: string, pin: string) => void
@@ -87,8 +92,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const logWrites = useRef(Promise.resolve())
   const pending = useRef<UpdatePackage | null>(null)
   const syncing = useRef(false)
+  const syncAgain = useRef(false)
   const [snap, setSnap] = useState<Snapshot>({ tests: [], containers: [], departments: [], revision: 0, staff: [] })
-  const [logState, setLogState] = useState<{ logs: LogView[]; waitingUpload: number; needsPin: NeedsPin[] }>({ logs: [], waitingUpload: 0, needsPin: [] })
+  const [logState, setLogState] = useState<{ logs: LogView[]; waitingUpload: number; needsPin: NeedsPin[]; uploadProblems: NeedsPin[] }>({ logs: [], waitingUpload: 0, needsPin: [], uploadProblems: [] })
   const [sync, setSync] = useState<SyncSettings>({ ...DEFAULT_SYNC })
   const [update, setUpdate] = useState<SyncCheck | null>(null)
   const [checking, setChecking] = useState(false)
@@ -123,6 +129,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       waitingUpload: out.length,
       needsPin: out
         .filter((o) => o.item.needsPin)
+        .map((o) => ({ eventId: o.event.id, staffName: o.event.staffName, staffNumber: o.event.staffNumber, labNumber: o.log.labNumber, error: o.item.error })),
+      uploadProblems: out
+        .filter((o) => !o.item.needsPin && o.item.error)
         .map((o) => ({ eventId: o.event.id, staffName: o.event.staffName, staffNumber: o.event.staffNumber, labNumber: o.log.labNumber, error: o.item.error }))
     })
   }, [])
@@ -372,9 +381,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // ---------- Cloud team sync ----------
 
-  const teamSync = useCallback(async () => {
+  const teamSync = useCallback(async (): Promise<void> => {
     const c = cloudRef.current
-    if (!c || syncing.current || !coreRef.current || !logsRef.current) return
+    if (!c || !coreRef.current || !logsRef.current) return
+    // A sample logged while a sync is running still goes up straight after it, not a minute later.
+    if (syncing.current) {
+      syncAgain.current = true
+      return
+    }
     syncing.current = true
     try {
       coreRef.current.replaceStaff(await c.listStaff())
@@ -386,6 +400,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } finally {
       syncing.current = false
       refresh()
+      if (syncAgain.current) {
+        syncAgain.current = false
+        void teamSync()
+      }
     }
   }, [refresh])
 
@@ -396,6 +414,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (err) throw new Error(err)
         const r = await new CloudClient(cfg).ping()
         const next = { ...syncRef.current, cloudUrl: cfg.url.trim().replace(/\/+$/, ''), cloudKey: cfg.anonKey.trim(), cloudDisconnected: false }
+        // A different project has its own entry numbers: read its sample log from the start.
+        if (next.cloudUrl !== syncRef.current.cloudUrl) logsRef.current?.resetPulled()
         saveSync(next)
         makeCloud(next)
         setSess(null)
@@ -411,6 +431,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
     [saveSync, makeCloud, setSess, teamSync]
   )
+
+  const reconnectLabCloud = useCallback(() => setCloud({ url: BUILT_IN_CLOUD.url, anonKey: BUILT_IN_CLOUD.anonKey }), [setCloud])
 
   // Check when the app opens, every minute/few minutes while open, and when it returns to the foreground.
   useEffect(() => {
@@ -496,6 +518,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       publish,
       setFeedUrl,
       setCloud,
+      reconnectLabCloud,
       teamSync,
       createLog,
       addLogEvent,
@@ -523,6 +546,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     publish,
     setFeedUrl,
     setCloud,
+    reconnectLabCloud,
     teamSync,
     createLog,
     addLogEvent,

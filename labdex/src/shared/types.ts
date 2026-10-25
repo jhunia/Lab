@@ -188,6 +188,8 @@ export interface LabDexApi {
   changeOwnPin(staffId: string, oldPin: string, newPin: string): Promise<void>
   // Cloud (Supabase)
   setCloud(cfg: { url: string; anonKey: string } | null): Promise<{ staff: number }>
+  /** Connects (back) to the lab's own built-in cloud project. */
+  reconnectLabCloud(): Promise<{ staff: number }>
   syncTeam(): Promise<void>
   // Sample log
   getLogs(): Promise<LogState>

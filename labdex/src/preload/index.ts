@@ -27,6 +27,7 @@ const api: LabDexApi = {
   saveStaff: (input, newPin) => ipcRenderer.invoke('staff:save', input, newPin),
   changeOwnPin: (staffId, oldPin, newPin) => ipcRenderer.invoke('staff:changePin', staffId, oldPin, newPin),
   setCloud: (cfg) => ipcRenderer.invoke('cloud:set', cfg),
+  reconnectLabCloud: () => ipcRenderer.invoke('cloud:reconnect'),
   syncTeam: () => ipcRenderer.invoke('cloud:sync'),
   getLogs: () => ipcRenderer.invoke('logs:all'),
   createLog: (input) => ipcRenderer.invoke('logs:create', input),

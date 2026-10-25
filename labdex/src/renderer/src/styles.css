@@ -3212,3 +3212,9 @@ button.card:hover {
 .set-card header .btn svg {
   color: inherit;
 }
+
+/* Settings: rarely-needed options folded away */
+.advanced { margin-top: 10px; }
+.advanced > summary { cursor: pointer; font-size: 12.5px; list-style: none; }
+.advanced > summary::-webkit-details-marker { display: none; }
+.advanced[open] > summary { margin-bottom: 8px; }

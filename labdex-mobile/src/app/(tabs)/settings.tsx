@@ -10,6 +10,7 @@ import { File, Paths } from 'expo-file-system'
 import { CheckCircle2, ChevronRight, Cloud, CloudOff, Download, FileUp, Monitor, Moon, RefreshCcw, RefreshCw, Send, SlidersHorizontal, Sun, Upload, UsersRound } from 'lucide-react-native'
 import { importCsv, toCsv } from '@shared/csv'
 import { relTime } from '@shared/helpers'
+import { BUILT_IN_CLOUD } from '@shared/cloud-config'
 import { errMsg, useData } from '@/lib/data'
 import { useRequireStaff } from '@/lib/identity'
 import { font, useTheme, type ThemePref } from '@/lib/theme'
@@ -26,6 +27,8 @@ export default function Settings() {
   const [url, setUrl] = useState(sync.cloudUrl)
   const [key, setKey] = useState('')
   const [connecting, setConnecting] = useState(false)
+  const [otherCloud, setOtherCloud] = useState(false)
+  const onLabCloud = sync.cloudUrl === BUILT_IN_CLOUD.url
   const [publisher, setPublisher] = useState('')
 
   useEffect(() => setFeed(sync.feedUrl), [sync.feedUrl])
@@ -45,12 +48,15 @@ export default function Settings() {
     Alert.alert(title, errMsg(e))
   }
 
-  const connect = async () => {
+  const connected = (r: { staff: number }) =>
+    ok('Connected to the lab cloud', r.staff ? `${r.staff} staff on the list. Logs and updates are shared again.` : 'The staff list is empty — add yourself as the first Senior in Staff.')
+
+  // Anyone may reconnect: it only restores the lab's own project, nothing to type.
+  const reconnect = async () => {
     setConnecting(true)
     try {
-      const r = await d.setCloud({ url, anonKey: key })
-      setKey('')
-      ok('Connected to the cloud', r.staff ? `${r.staff} staff on the list.` : 'The staff list is empty — add yourself as the first Senior in Staff.')
+      connected(await d.reconnectLabCloud())
+      setOtherCloud(false)
     } catch (e) {
       fail('Could not connect', e)
     } finally {
@@ -58,11 +64,28 @@ export default function Settings() {
     }
   }
 
-  const disconnect = () =>
-    Alert.alert('Disconnect from the cloud?', 'This phone will stop sharing logs and receiving updates until you connect again. Nothing is deleted.', [
+  // Pointing a phone at a different project is a Senior's job (it changes whose staff list and logs it sees).
+  const connectOther = async () => {
+    if (!(await requireStaff('SENIOR', 'connect to a different cloud'))) return
+    setConnecting(true)
+    try {
+      connected(await d.setCloud({ url, anonKey: key }))
+      setKey('')
+      setOtherCloud(false)
+    } catch (e) {
+      fail('Could not connect', e)
+    } finally {
+      setConnecting(false)
+    }
+  }
+
+  const pause = async () => {
+    if (!(await requireStaff('SENIOR', 'pause the cloud on this phone'))) return
+    Alert.alert('Pause the cloud on this phone?', 'This phone stops sharing sample logs and receiving test updates. Nothing is deleted — tap “Reconnect” any time to carry on.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Disconnect', style: 'destructive', onPress: () => void d.setCloud(null) }
+      { text: 'Pause', style: 'destructive', onPress: () => void d.setCloud(null) }
     ])
+  }
 
   const exportCsv = async () => {
     try {
@@ -134,37 +157,54 @@ export default function Settings() {
         <SectionTitle>Cloud</SectionTitle>
         <Card style={{ padding: 14, gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            {cloud.connected ? <Cloud size={18} color={c.accent} /> : <CloudOff size={18} color={c.muted} />}
-            <Text style={{ flex: 1, fontFamily: font.bodySemi, fontSize: 15, color: c.ink }}>{cloud.connected ? 'Connected' : 'Not connected'}</Text>
+            {cloud.connected ? <Cloud size={18} color={c.ink} /> : <CloudOff size={18} color={c.danger} />}
+            <Text style={{ flex: 1, fontFamily: font.bodySemi, fontSize: 15, color: c.ink }}>
+              {cloud.connected ? (onLabCloud ? 'Connected to the lab cloud' : 'Connected to another cloud') : 'Cloud is paused on this phone'}
+            </Text>
             {cloud.connected && cloud.lastSyncAt ? <Text style={{ fontFamily: font.mono, fontSize: 11, color: c.muted }}>synced {relTime(cloud.lastSyncAt)}</Text> : null}
           </View>
           {cloud.connected ? (
             <>
-              <Text style={{ fontFamily: font.body, fontSize: 13.5, lineHeight: 19, color: c.ink2 }}>
-                Staff list, published tests and the sample log are shared through {sync.cloudUrl.replace('https://', '')}. Syncs every minute and when you open the app.
-              </Text>
               {cloud.error ? (
-                <Text style={{ fontFamily: font.body, fontSize: 13, color: c.danger }}>{cloud.error}</Text>
+                <View style={{ gap: 3 }}>
+                  <Text style={{ fontFamily: font.bodySemi, fontSize: 13.5, color: c.danger }}>Can’t reach the cloud right now</Text>
+                  <Text style={{ fontFamily: font.body, fontSize: 13, lineHeight: 18, color: c.ink2 }}>
+                    Keep working — entries are saved on this phone and upload by themselves when the connection is back.
+                  </Text>
+                  <Text style={{ fontFamily: font.mono, fontSize: 11, color: c.muted }}>{cloud.error}</Text>
+                </View>
               ) : (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <CheckCircle2 size={14} color={c.accent} />
-                  <Text style={{ fontFamily: font.bodySemi, fontSize: 13, color: c.accent }}>Working</Text>
+                  <CheckCircle2 size={14} color={c.success} />
+                  <Text style={{ fontFamily: font.body, fontSize: 13, color: c.ink2 }}>Staff, sample logs and test updates are shared. Syncs every minute.</Text>
                 </View>
               )}
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Button small icon={RefreshCw} label="Sync now" style={{ flex: 1 }} onPress={() => void d.teamSync()} />
-                <Button small variant="ghost" label="Disconnect" onPress={disconnect} />
-              </View>
+              <Button small icon={RefreshCw} label="Sync now" onPress={() => void d.teamSync()} />
+              {!onLabCloud && <Button small icon={Cloud} label={connecting ? 'Connecting…' : 'Switch back to the lab cloud'} disabled={connecting} onPress={reconnect} />}
+              <Pressable onPress={pause} hitSlop={8} style={{ alignSelf: 'center' }}>
+                <Text style={{ fontFamily: font.body, fontSize: 12.5, color: c.muted, textDecorationLine: 'underline' }}>Pause cloud on this phone (Senior)</Text>
+              </Pressable>
             </>
           ) : (
             <>
               <Text style={{ fontFamily: font.body, fontSize: 13.5, lineHeight: 19, color: c.ink2 }}>
-                Connect to share the staff list, sample log and test updates between all phones and PCs. Use the Project URL and the <Text style={{ fontFamily: font.bodySemi }}>anon / publishable</Text> key from Supabase → Project Settings → API (never the secret key).
+                This phone isn’t sharing with the team. Sample logs stay on this phone until you reconnect.
+              </Text>
+              <Button icon={Cloud} variant="primary" label={connecting ? 'Connecting…' : 'Reconnect to the lab cloud'} disabled={connecting} onPress={reconnect} />
+            </>
+          )}
+          <Pressable onPress={() => setOtherCloud((v) => !v)} hitSlop={8} style={{ alignSelf: 'center' }}>
+            <Text style={{ fontFamily: font.body, fontSize: 12, color: c.muted }}>{otherCloud ? 'Hide' : 'Use a different cloud project (Senior)…'}</Text>
+          </Pressable>
+          {otherCloud && (
+            <View style={{ gap: 8, paddingTop: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }}>
+              <Text style={{ fontFamily: font.body, fontSize: 12.5, lineHeight: 18, color: c.muted }}>
+                Only for moving to a new Supabase project. Use its Project URL and anon key (Project Settings → API) — never the secret key.
               </Text>
               <Input value={url} onChangeText={setUrl} placeholder="https://abcd1234.supabase.co" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
-              <Input value={key} onChangeText={setKey} placeholder="anon / publishable key" autoCapitalize="none" autoCorrect={false} />
-              <Button icon={Cloud} variant="primary" label={connecting ? 'Connecting…' : 'Connect'} disabled={connecting || !url.trim() || !key.trim()} onPress={connect} />
-            </>
+              <Input value={key} onChangeText={setKey} placeholder="anon key" autoCapitalize="none" autoCorrect={false} />
+              <Button small label={connecting ? 'Connecting…' : 'Connect'} disabled={connecting || !url.trim() || !key.trim()} onPress={connectOther} />
+            </View>
           )}
         </Card>
       </View>

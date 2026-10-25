@@ -72,12 +72,29 @@ export interface PushResult {
   offline: boolean
 }
 
-/** Uploads queued sample-log entries. Stops at the first network error (keeps the rest queued). */
+/**
+ * Uploads queued sample-log entries. Stops at the first network error (keeps the rest queued).
+ * A rejected PIN is tried only once per pass: a tech who logged ten samples offline with a mistyped
+ * PIN must not trip the cloud's 5-wrong-PINs lockout just by reconnecting.
+ */
 export async function pushOutbox(cloud: CloudClient, logs: LogCore): Promise<PushResult> {
   const r: PushResult = { uploaded: 0, needsPin: 0, failed: 0, offline: false }
+  const wrongPin = new Set<string>() // staffNumber + PIN the cloud has just rejected
+  const blocked = new Set<string>() // staff numbers that are locked out or unknown right now
   for (const { item, event, log } of logs.outbox()) {
     if (item.needsPin || !item.pin) {
       r.needsPin++
+      continue
+    }
+    const who = event.staffNumber.toLowerCase()
+    if (wrongPin.has(`${who}
+${item.pin}`)) {
+      logs.markFailed(event.id, 'Wrong PIN', true)
+      r.needsPin++
+      continue
+    }
+    if (blocked.has(who)) {
+      r.failed++
       continue
     }
     try {
@@ -87,8 +104,15 @@ export async function pushOutbox(cloud: CloudClient, logs: LogCore): Promise<Pus
     } catch (e) {
       if (e instanceof CloudRefused) {
         logs.markFailed(event.id, e.message, e.wrongPin)
-        if (e.wrongPin) r.needsPin++
-        else r.failed++
+        if (e.wrongPin) {
+          wrongPin.add(`${who}
+${item.pin}`)
+          r.needsPin++
+        } else {
+          // Locked out / unknown / inactive: the same answer applies to this person's other entries.
+          if (/too many|unknown|inactive/i.test(e.message)) blocked.add(who)
+          r.failed++
+        }
       } else {
         r.offline = true
         break
@@ -98,13 +122,22 @@ export async function pushOutbox(cloud: CloudClient, logs: LogCore): Promise<Pus
   return r
 }
 
+/**
+ * How far back each pull re-reads. Sequence numbers are handed out when an upload starts but become
+ * visible when it commits, so two phones uploading at once can make #41 appear after #42 was read.
+ * Re-reading a short overlap catches those; entries already on the device are ignored by merge().
+ */
+const PULL_OVERLAP = 100
+
 /** Pulls sample-log entries uploaded by other devices. Returns how many new entries arrived. */
 export async function pullLogs(cloud: CloudClient, logs: LogCore): Promise<number> {
   let added = 0
+  let after = Math.max(0, logs.pulledSeq - PULL_OVERLAP)
   for (let guard = 0; guard < 50; guard++) {
-    const page = await cloud.pullEvents(logs.pulledSeq)
+    const page = await cloud.pullEvents(after)
     added += logs.merge(page.logs, page.events, page.lastSeq)
     if (page.events.length < 500) break
+    after = page.lastSeq
   }
   return added
 }

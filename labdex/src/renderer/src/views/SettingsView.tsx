@@ -36,13 +36,12 @@ export function SettingsView({ snap, update, checking, onCheck, onSync, onChange
     }
   })
 
-  const connect = async () => {
+  const reconnect = async () => {
     setConnecting(true)
     try {
-      const r = await api.setCloud({ url, anonKey: key })
-      setKey('')
+      const r = await api.reconnectLabCloud()
       await onChanged()
-      toast('ok', 'Connected to the cloud', r.staff ? `${r.staff} staff on the list` : 'The staff list is empty — add yourself as the first Senior under Staff')
+      toast('ok', 'Connected to the lab cloud', r.staff ? `${r.staff} staff on the list` : 'The staff list is empty — add yourself as the first Senior under Staff')
     } catch (e) {
       toast('error', 'Could not connect', errMsg(e))
     } finally {
@@ -50,13 +49,29 @@ export function SettingsView({ snap, update, checking, onCheck, onSync, onChange
     }
   }
 
-  const disconnect = async () => {
+  const connect = async () => {
+    setConnecting(true)
     try {
+      await requireStaff('SENIOR', 'connect to a different cloud')
+      const r = await api.setCloud({ url, anonKey: key })
+      setKey('')
+      await onChanged()
+      toast('ok', 'Connected to the cloud', r.staff ? `${r.staff} staff on the list` : 'The staff list is empty — add yourself as the first Senior under Staff')
+    } catch (e) {
+      if (!isCancel(e)) toast('error', 'Could not connect', errMsg(e))
+    } finally {
+      setConnecting(false)
+    }
+  }
+
+  const pause = async () => {
+    try {
+      await requireStaff('SENIOR', 'pause the cloud on this computer')
       await api.setCloud(null)
       await onChanged()
-      toast('ok', 'Disconnected', 'This computer now works on its own again')
+      toast('ok', 'Cloud paused', 'Nothing was deleted — click “Reconnect to the lab cloud” to carry on')
     } catch (e) {
-      toast('error', 'Something went wrong', errMsg(e))
+      if (!isCancel(e)) toast('error', 'Something went wrong', errMsg(e))
     }
   }
 
@@ -115,12 +130,23 @@ export function SettingsView({ snap, update, checking, onCheck, onSync, onChange
               <button className="btn" onClick={() => api.syncTeam().then(onChanged)}>
                 <RefreshCw size={14} /> Sync now
               </button>
-              <button className="btn btn-ghost" onClick={disconnect}>
-                Disconnect
+              <button className="btn btn-ghost" onClick={pause}>
+                Pause cloud (Senior)
               </button>
             </div>
           </>
         ) : (
+          <>
+            <p className="muted">This computer isn’t sharing with the team. Sample logs stay here until you reconnect.</p>
+            <div className="set-row">
+              <button className="btn btn-primary" disabled={connecting} onClick={reconnect}>
+                <Cloud size={14} /> {connecting ? 'Connecting…' : 'Reconnect to the lab cloud'}
+              </button>
+            </div>
+          </>
+        )}
+        <details className="advanced">
+          <summary className="muted">Use a different cloud project (Senior)…</summary>
           <>
             <ol className="steps">
               <li>
@@ -146,7 +172,7 @@ export function SettingsView({ snap, update, checking, onCheck, onSync, onChange
               </button>
             </div>
           </>
-        )}
+        </details>
       </section>
 
       <section className="set-card">
