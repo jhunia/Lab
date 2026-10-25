@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { Stack } from 'expo-router'
+import { useEffect } from 'react'
+import { Stack, router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { Platform, View, useWindowDimensions } from 'react-native'
 import { useFonts } from 'expo-font'
@@ -18,11 +19,23 @@ import '@/lib/background'
 import '@/lib/web-alert'
 import { DataProvider, useData } from '@/lib/data'
 import { IdentityProvider } from '@/lib/identity'
+import { hasSeenWelcome } from '@/lib/welcome'
 import { ThemeProvider, font, useTheme } from '@/lib/theme'
 
 function Navigator() {
   const { c, mode } = useTheme()
   const { ready } = useData()
+  // First launch only: open the short walkthrough once the app has loaded.
+  useEffect(() => {
+    if (!ready) return
+    let alive = true
+    void hasSeenWelcome().then((seen) => {
+      if (!seen && alive) setTimeout(() => router.push('/welcome'), 300)
+    })
+    return () => {
+      alive = false
+    }
+  }, [ready])
   if (!ready) return <View style={{ flex: 1, backgroundColor: c.bg }} />
   return (
     <WebFrame>
@@ -45,6 +58,7 @@ function Navigator() {
         <Stack.Screen name="log/new" options={{ presentation: 'modal', title: 'Log a sample' }} />
         <Stack.Screen name="log/[id]" options={{ title: '' }} />
         <Stack.Screen name="log/scan" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+        <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false }} />
       </Stack>
     </WebFrame>
   )

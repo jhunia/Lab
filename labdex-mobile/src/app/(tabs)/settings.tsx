@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Haptics from 'expo-haptics'
-import { CheckCircle2, ChevronRight, KeyRound, ShieldCheck, Cloud, CloudOff, Download, FileUp, Monitor, Moon, RefreshCcw, RefreshCw, Send, SlidersHorizontal, Sun, Upload, UsersRound } from 'lucide-react-native'
+import { BookOpen, CheckCircle2, ChevronRight, KeyRound, ShieldCheck, Cloud, CloudOff, Download, FileUp, Monitor, Moon, RefreshCcw, RefreshCw, Send, SlidersHorizontal, Sun, Upload, UsersRound } from 'lucide-react-native'
 import { importCsv, toCsv } from '@shared/csv'
 import { relTime } from '@shared/helpers'
 import { BUILT_IN_CLOUD } from '@shared/cloud-config'
@@ -305,7 +305,8 @@ export default function Settings() {
         <View>
           <SectionTitle>You</SectionTitle>
           <Card>
-            <Row icon={<KeyRound size={17} color={c.ink2} />} label="Change my PIN" onPress={() => router.push('/staff')} last />
+            <Row icon={<KeyRound size={17} color={c.ink2} />} label="Change my PIN" onPress={() => router.push('/staff')} />
+          <Row icon={<BookOpen size={17} color={c.ink2} />} label="How LabDex works" onPress={() => router.push('/welcome')} last />
           </Card>
         </View>
       )}
