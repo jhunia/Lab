@@ -110,6 +110,8 @@ export interface SyncSettings {
   cloudKey: string
   /** Set when someone pressed Disconnect, so the built-in project is not re-applied. */
   cloudDisconnected?: boolean
+  /** Sample log syncs by itself (default). false = entries stay on this device until someone taps Sync. */
+  autoSync?: boolean
 }
 
 export const DEFAULT_SYNC: SyncSettings = { feedUrl: '', syncedRevision: 0, lastCheckedAt: null, cloudUrl: '', cloudKey: '' }

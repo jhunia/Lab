@@ -1,9 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AppState } from 'react-native'
-import * as DocumentPicker from 'expo-document-picker'
-import * as Sharing from 'expo-sharing'
-import { File, Paths } from 'expo-file-system'
 import { LabCore, createSeedDb, parsePackage, type DbFile, type UpdatePackage } from '@shared/core'
 import { searchTests } from '@shared/search'
 import { CHECK_INTERVAL_MS, UPDATE_FILE_NAME, checkFeed, httpGetText } from '@shared/sync'
@@ -13,6 +10,7 @@ import { LogCore, emptyLogFile, type LogFile, type LogView, type SampleStatus } 
 import { PinThrottle, SESSION_MS, hasRole, type Staff, type StaffInput, type StaffRole, type StaffSession } from '@shared/staff'
 import { identify, pullLogs, pushOutbox, sessionValid } from '@shared/teamsync'
 import { DEFAULT_SYNC, type CloudStatus, type Container, type Department, type LabTest, type SyncCheck, type SyncSettings } from '@shared/types'
+import { pickTextFile, saveTextFile } from './files'
 import { DB_KEY, LOGS_KEY, SYNC_KEY, enableUpdateNotifications, loadSync, notifyUpdate } from './background'
 
 /** How often the open app syncs the staff list, sample log and releases with the cloud. */
@@ -24,6 +22,14 @@ interface Snapshot {
   departments: Department[]
   revision: number
   staff: Staff[]
+}
+
+export interface SyncSummary {
+  sent: number
+  received: number
+  needsPin: number
+  failed: number
+  offline: boolean
 }
 
 export interface NeedsPin {
@@ -66,7 +72,11 @@ interface DataCtx extends Snapshot {
   setFeedUrl: (url: string) => Promise<void>
   // Cloud
   setCloud: (cfg: { url: string; anonKey: string } | null) => Promise<{ staff: number }>
-  teamSync: () => Promise<void>
+  /** Sends this phone's sample-log entries and brings the team's down (staff list too). */
+  teamSync: (opts?: { logs: boolean }) => Promise<SyncSummary | null>
+  /** Sample log syncs by itself (on by default). Off = only when someone taps Sync. */
+  autoSync: boolean
+  setAutoSync: (on: boolean) => void
   // Sample log
   logs: LogView[]
   waitingUpload: number
@@ -341,9 +351,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [applyPackage])
 
   const openUpdateFile = useCallback(async () => {
-    const res = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain', '*/*'], copyToCacheDirectory: true })
-    if (res.canceled || !res.assets[0]) return null
-    return applyPackage(parsePackage(await new File(res.assets[0].uri).text()))
+    const text = await pickTextFile(['application/json', 'text/plain', '*/*'])
+    return text === null ? null : applyPackage(parsePackage(text))
   }, [applyPackage])
 
   const publish = useCallback(
@@ -360,12 +369,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
       saveSync({ ...syncRef.current, syncedRevision: pkg.revision })
       refresh()
-      const file = new File(Paths.cache, UPDATE_FILE_NAME)
-      if (file.exists) file.delete()
-      file.create()
-      await file.write(JSON.stringify(pkg))
-      if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is not available on this device')
-      await Sharing.shareAsync(file.uri, { mimeType: 'application/json', dialogTitle: 'Publish LabDex update', UTI: 'public.json' })
+      await saveTextFile(UPDATE_FILE_NAME, JSON.stringify(pkg), { mimeType: 'application/json', dialogTitle: 'Publish LabDex update', UTI: 'public.json' })
       return 'file'
     },
     [refresh, saveSync, requireRole]
@@ -381,31 +385,55 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // ---------- Cloud team sync ----------
 
-  const teamSync = useCallback(async (): Promise<void> => {
-    const c = cloudRef.current
-    if (!c || !coreRef.current || !logsRef.current) return
-    // A sample logged while a sync is running still goes up straight after it, not a minute later.
-    if (syncing.current) {
-      syncAgain.current = true
-      return
-    }
-    syncing.current = true
-    try {
-      coreRef.current.replaceStaff(await c.listStaff())
-      await pushOutbox(c, logsRef.current)
-      await pullLogs(c, logsRef.current)
-      setCloudStatus({ connected: true, lastSyncAt: new Date().toISOString(), error: '' })
-    } catch (e) {
-      setCloudStatus((s) => ({ ...s, error: e instanceof Error ? e.message : String(e) }))
-    } finally {
-      syncing.current = false
-      refresh()
-      if (syncAgain.current) {
-        syncAgain.current = false
-        void teamSync()
+  /**
+   * Refreshes the staff list (names only — so newly added staff can confirm on this phone) and, when
+   * `logs` is set, sends this phone's sample-log entries and brings the team's down.
+   */
+  const teamSync = useCallback(
+    async (opts: { logs: boolean } = { logs: true }): Promise<SyncSummary | null> => {
+      const c = cloudRef.current
+      if (!c || !coreRef.current || !logsRef.current) return null
+      // A sync asked for while one is running happens straight after it.
+      if (syncing.current) {
+        syncAgain.current = syncAgain.current || opts.logs
+        return null
       }
-    }
-  }, [refresh])
+      syncing.current = true
+      try {
+        coreRef.current.replaceStaff(await c.listStaff())
+        if (!opts.logs) {
+          setCloudStatus((s) => ({ ...s, connected: true, error: '' }))
+          return null
+        }
+        const pushed = await pushOutbox(c, logsRef.current)
+        const received = await pullLogs(c, logsRef.current)
+        setCloudStatus({ connected: true, lastSyncAt: new Date().toISOString(), error: pushed.offline ? 'No connection to the cloud' : '' })
+        return { sent: pushed.uploaded, received, needsPin: pushed.needsPin, failed: pushed.failed, offline: pushed.offline }
+      } catch (e) {
+        setCloudStatus((s) => ({ ...s, error: e instanceof Error ? e.message : String(e) }))
+        throw e
+      } finally {
+        syncing.current = false
+        refresh()
+        if (syncAgain.current) {
+          syncAgain.current = false
+          void teamSync().catch(() => {})
+        }
+      }
+    },
+    [refresh]
+  )
+
+  const autoSync = sync.autoSync !== false
+  /** Every minute, on open and after each entry: the staff list always; the sample log only when auto-sync is on. */
+  const backgroundSync = useCallback(() => void teamSync({ logs: syncRef.current.autoSync !== false }).catch(() => {}), [teamSync])
+  const setAutoSync = useCallback(
+    (on: boolean) => {
+      saveSync({ ...syncRef.current, autoSync: on })
+      if (on) void teamSync({ logs: true }).catch(() => {})
+    },
+    [saveSync, teamSync]
+  )
 
   const setCloud = useCallback(
     async (cfg: { url: string; anonKey: string } | null) => {
@@ -420,7 +448,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         makeCloud(next)
         setSess(null)
         await enableUpdateNotifications()
-        await teamSync()
+        await teamSync().catch(() => {})
         return r
       }
       const next = { ...syncRef.current, cloudUrl: '', cloudKey: '', cloudDisconnected: true }
@@ -438,11 +466,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return
     const run = () => {
-      void teamSync()
+      backgroundSync()
       if (cloudRef.current || syncRef.current.feedUrl) void checkUpdate()
     }
     run()
-    const team = setInterval(() => void teamSync(), TEAM_SYNC_MS)
+    const team = setInterval(backgroundSync, TEAM_SYNC_MS)
     const upd = setInterval(() => (cloudRef.current || syncRef.current.feedUrl) && void checkUpdate(), CHECK_INTERVAL_MS)
     const sub = AppState.addEventListener('change', (st) => st === 'active' && run())
     return () => {
@@ -450,7 +478,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       clearInterval(upd)
       sub.remove()
     }
-  }, [ready, sync.cloudUrl, sync.feedUrl, teamSync, checkUpdate])
+  }, [ready, sync.cloudUrl, sync.feedUrl, backgroundSync, checkUpdate])
 
   // ---------- Sample log ----------
 
@@ -461,10 +489,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const person = coreRef.current!.snapshot().staff.find((s) => s.id === who.staffId)!
       const log = logsRef.current!.create(input, person, who.pin)
       refresh()
-      void teamSync()
+      backgroundSync()
       return log.id
     },
-    [requireRole, refresh, teamSync]
+    [requireRole, refresh, backgroundSync]
   )
 
   const addLogEvent = useCallback(
@@ -474,16 +502,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const person = coreRef.current!.snapshot().staff.find((s) => s.id === who.staffId)!
       logsRef.current!.addEvent(logId, status, note, person, who.pin)
       refresh()
-      void teamSync()
+      backgroundSync()
     },
-    [requireRole, refresh, teamSync]
+    [requireRole, refresh, backgroundSync]
   )
 
   const reconfirmUpload = useCallback(
     (eventId: string, pin: string) => {
       logsRef.current!.reconfirm(eventId, pin)
       refresh()
-      void teamSync()
+      // Re-entering the PIN is a request to send those entries now.
+      void teamSync({ logs: true }).catch(() => {})
     },
     [refresh, teamSync]
   )
@@ -520,6 +549,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setCloud,
       reconnectLabCloud,
       teamSync,
+      autoSync,
+      setAutoSync,
       createLog,
       addLogEvent,
       reconfirmUpload
@@ -548,6 +579,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setCloud,
     reconnectLabCloud,
     teamSync,
+    autoSync,
+    setAutoSync,
     createLog,
     addLogEvent,
     reconfirmUpload

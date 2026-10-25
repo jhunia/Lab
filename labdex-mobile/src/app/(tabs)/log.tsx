@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
-import { AlertTriangle, Barcode, Copy, CloudAlert, Clock, CloudCheck, CloudOff, CloudUpload, KeyRound, Lock, NotebookPen, Plus, Search, X } from 'lucide-react-native'
+import { AlertTriangle, Barcode, RefreshCw, Copy, CloudAlert, Clock, CloudCheck, CloudOff, CloudUpload, KeyRound, Lock, NotebookPen, Plus, Search, X } from 'lucide-react-native'
 import { sampleAlerts, type LogView, type SampleAlert } from '@shared/logs'
 import type { LabTest } from '@shared/types'
 import { relTime } from '@shared/helpers'
@@ -30,13 +30,15 @@ const CLOSED_WINDOW_MS = 12 * 3600 * 1000
 export default function Register() {
   const { c } = useTheme()
   const insets = useSafeAreaInsets()
-  const { logs, tests, con, cloud, waitingUpload, needsPin, uploadProblems, reconfirmUpload, staff, session, lock } = useData()
+  const { logs, tests, con, cloud, waitingUpload, needsPin, uploadProblems, reconfirmUpload, staff, session, lock, teamSync, autoSync } = useData()
   const requireStaff = useRequireStaff()
   const [filter, setFilter] = useState<Filter>('open')
   const [searching, setSearching] = useState(false)
   const [q, setQ] = useState('')
   const [reconfirm, setReconfirm] = useState<(typeof needsPin)[number] | null>(null)
   const [, tick] = useState(0)
+  const [syncing, setSyncing] = useState(false)
+  const [syncNote, setSyncNote] = useState<{ text: string; bad: boolean } | null>(null)
 
   // Keep elapsed times and deadlines current.
   useEffect(() => {
@@ -81,6 +83,26 @@ export default function Register() {
   const waiting = waitingUpload - needsPin.length - uploadProblems.length
 
   const needsSetup = staff.length === 0 && !cloud.connected
+
+  // Entries sync by themselves (unless this phone turned auto-sync off); Sync sends them right now.
+  const syncNow = async () => {
+    tap()
+    setSyncing(true)
+    setSyncNote(null)
+    try {
+      const r = await teamSync()
+      if (r?.offline) setSyncNote({ text: 'Couldn’t reach the cloud — your entries are safe on this phone. Try again later.', bad: true })
+      else if (r) {
+        const parts = [r.sent ? `sent ${r.sent}` : '', r.received ? `received ${r.received}` : ''].filter(Boolean)
+        setSyncNote({ text: parts.length ? `Synced — ${parts.join(', ')}.` : 'Synced — nothing new.', bad: r.needsPin + r.failed > 0 })
+      }
+    } catch {
+      setSyncNote({ text: 'Couldn’t reach the cloud — your entries are safe on this phone. Try again later.', bad: true })
+    } finally {
+      setSyncing(false)
+      setTimeout(() => setSyncNote(null), 6000)
+    }
+  }
   const begin = async (path: '/log/new' | '/log/scan') => {
     if (needsSetup) {
       Alert.alert('Set up the staff list first', 'Add yourself as the first Senior in Settings → Staff, then add the lab techs.', [
@@ -179,7 +201,7 @@ export default function Register() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 150 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+      <ScrollView contentContainerStyle={{ paddingBottom: 170 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <View style={{ paddingTop: insets.top + 14, paddingHorizontal: 16 }}>
           <View style={styles.headRow}>
             <Text style={{ fontFamily: font.body, fontSize: 12.5, color: c.muted }}>{shiftLabel()}</Text>
@@ -293,23 +315,39 @@ export default function Register() {
 
       <View style={[styles.bar, { backgroundColor: c.bg, borderTopColor: c.ink }]}>
         <View style={styles.sync}>
-          {!cloud.connected ? (
-            <>
-              <CloudOff size={13} color={c.muted} />
-              <Text style={{ fontFamily: font.body, fontSize: 11.5, color: c.muted }}>Saved on this phone only — connect the cloud in Settings</Text>
-            </>
-          ) : waiting > 0 ? (
-            <>
-              <CloudUpload size={13} color={c.amber} />
-              <Text style={{ fontFamily: font.body, fontSize: 11.5, color: c.amber }}>
-                {waiting} waiting to upload{cloud.error ? ' · offline' : ''}
-              </Text>
-            </>
-          ) : (
-            <>
-              <CloudCheck size={13} color={c.success} />
-              <Text style={{ fontFamily: font.body, fontSize: 11.5, color: c.success }}>All entries uploaded{cloud.lastSyncAt ? ` · ${relTime(cloud.lastSyncAt)}` : ''}</Text>
-            </>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {!cloud.connected ? (
+              <>
+                <CloudOff size={14} color={c.muted} />
+                <Text style={[styles.syncText, { color: c.muted }]}>Cloud off — entries stay on this phone</Text>
+              </>
+            ) : syncNote ? (
+              <Text style={[styles.syncText, { color: syncNote.bad ? c.danger : c.success }]}>{syncNote.text}</Text>
+            ) : waiting > 0 ? (
+              <>
+                <CloudUpload size={14} color={c.amber} />
+                <Text style={[styles.syncText, { color: c.amber }]}>
+                  {waiting} entr{waiting === 1 ? 'y' : 'ies'} only on this phone{autoSync ? ' — sending automatically' : ' — tap Sync to send'}
+                </Text>
+              </>
+            ) : (
+              <>
+                <CloudCheck size={14} color={c.success} />
+                <Text style={[styles.syncText, { color: c.ink2 }]}>{cloud.lastSyncAt ? `All synced · ${relTime(cloud.lastSyncAt)}` : 'Not synced yet'}</Text>
+              </>
+            )}
+          </View>
+          {cloud.connected && (
+            <Pressable
+              onPress={() => void syncNow()}
+              disabled={syncing}
+              style={({ pressed }) => [styles.syncBtn, { borderColor: c.ink, backgroundColor: waiting > 0 ? c.ink : 'transparent' }, pressed && { opacity: 0.8 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Sync with the team"
+            >
+              <RefreshCw size={14} color={waiting > 0 ? c.bg : c.ink} />
+              <Text style={{ fontFamily: font.displaySemi, fontSize: 15, letterSpacing: 1, color: waiting > 0 ? c.bg : c.ink }}>{syncing ? 'SYNCING…' : 'SYNC'}</Text>
+            </Pressable>
           )}
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -370,7 +408,9 @@ const styles = StyleSheet.create({
   chip: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 7, paddingVertical: 3, paddingHorizontal: 7, borderRadius: 2, alignSelf: 'flex-start' },
   empty: { alignItems: 'center', gap: 8, paddingVertical: 48, paddingHorizontal: 34 },
   bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 12, borderTopWidth: 2 },
-  sync: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginBottom: 8 },
+  sync: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8, minHeight: 34 },
+  syncText: { flexShrink: 1, fontFamily: font.body, fontSize: 12.5, lineHeight: 16 },
+  syncBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: 12, borderRadius: 5, borderWidth: 1.5 },
   primary: { flex: 1, height: 54, borderRadius: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   scan: { width: 54, height: 54, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' }
 })

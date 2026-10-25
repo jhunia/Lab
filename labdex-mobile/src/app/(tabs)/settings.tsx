@@ -1,17 +1,15 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import * as DocumentPicker from 'expo-document-picker'
 import * as Haptics from 'expo-haptics'
-import * as Sharing from 'expo-sharing'
-import { File, Paths } from 'expo-file-system'
 import { CheckCircle2, ChevronRight, KeyRound, ShieldCheck, Cloud, CloudOff, Download, FileUp, Monitor, Moon, RefreshCcw, RefreshCw, Send, SlidersHorizontal, Sun, Upload, UsersRound } from 'lucide-react-native'
 import { importCsv, toCsv } from '@shared/csv'
 import { relTime } from '@shared/helpers'
 import { BUILT_IN_CLOUD } from '@shared/cloud-config'
 import { errMsg, useData } from '@/lib/data'
+import { pickTextFile, saveTextFile } from '@/lib/files'
 import { useRequireStaff } from '@/lib/identity'
 import { useSeniorMode } from '@/lib/senior'
 import { font, useTheme, type ThemePref } from '@/lib/theme'
@@ -91,11 +89,7 @@ export default function Settings() {
 
   const exportCsv = async () => {
     try {
-      const file = new File(Paths.cache, `labdex-tests-${new Date().toISOString().slice(0, 10)}.csv`)
-      if (file.exists) file.delete()
-      file.create()
-      await file.write(toCsv(core))
-      await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', dialogTitle: 'Export LabDex tests', UTI: 'public.comma-separated-values-text' })
+      await saveTextFile(`labdex-tests-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(core), { mimeType: 'text/csv', dialogTitle: 'Export LabDex tests', UTI: 'public.comma-separated-values-text' })
     } catch (e) {
       fail('Export failed', e)
     }
@@ -104,9 +98,8 @@ export default function Settings() {
   const importFile = async () => {
     if (!(await requireStaff('SENIOR', 'import tests'))) return
     try {
-      const res = await DocumentPicker.getDocumentAsync({ type: ['text/csv', 'text/comma-separated-values', 'text/plain', 'application/vnd.ms-excel'], copyToCacheDirectory: true })
-      if (res.canceled || !res.assets[0]) return
-      const text = await new File(res.assets[0].uri).text()
+      const text = await pickTextFile(['text/csv', 'text/comma-separated-values', 'text/plain', 'application/vnd.ms-excel'])
+      if (text === null) return
       const r = mutate((x) => importCsv(x, text))
       ok(`Imported: ${r.added} added, ${r.updated} updated`, r.errors.length ? `${r.errors.length} row(s) skipped:\n\n${r.errors.slice(0, 5).join('\n')}` : 'All rows imported.')
     } catch (e) {
@@ -181,7 +174,16 @@ export default function Settings() {
                   <Text style={{ fontFamily: font.body, fontSize: 13, color: c.ink2 }}>Staff, sample logs and test updates are shared. Syncs every minute.</Text>
                 </View>
               )}
-              <Button small icon={RefreshCw} label="Sync now" onPress={() => void d.teamSync()} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: font.bodySemi, fontSize: 14, color: c.ink }}>Sync automatically</Text>
+                  <Text style={{ fontFamily: font.body, fontSize: 12.5, lineHeight: 17, color: c.muted }}>
+                    {d.autoSync ? 'Entries upload as soon as you save and every minute.' : 'Entries stay on this phone until you tap Sync on the Register.'}
+                  </Text>
+                </View>
+                <Switch value={d.autoSync} onValueChange={d.setAutoSync} trackColor={{ true: c.ink, false: c.lineStrong }} thumbColor={c.surface} accessibilityLabel="Sync automatically" />
+              </View>
+              <Button small icon={RefreshCw} label="Sync now" onPress={() => void d.teamSync().catch(() => {})} />
               {!onLabCloud && <Button small icon={Cloud} label={connecting ? 'Connecting…' : 'Switch back to the lab cloud'} disabled={connecting} onPress={reconnect} />}
               {senior.on && (
                 <Pressable onPress={pause} hitSlop={8} style={{ alignSelf: 'center' }}>
@@ -280,7 +282,9 @@ export default function Settings() {
             <SectionTitle>Publish test changes</SectionTitle>
             <Card style={{ padding: 14, gap: 10 }}>
               <Text style={{ fontFamily: font.body, fontSize: 13.5, lineHeight: 19, color: c.ink2 }}>
-                {cloud.connected ? 'After editing tests, publish so every device gets them.' : 'Creates an update file and opens the share menu — save it over the same file in your shared folder, or send it directly.'}
+                {cloud.connected
+              ? 'Test edits (new tests, changed volumes, TATs…) stay on this phone until you publish. Publishing sends the whole directory to the cloud; every phone gets “Update available” and switches to it with one tap. Sample logs and the staff list are not affected.'
+              : 'Test edits stay on this phone until you publish. Without the cloud, publishing makes an update file to share (WhatsApp, Drive, email); others open it in Settings → Test updates.'}
               </Text>
               <Input placeholder="Name shown to staff (optional)" value={publisher} onChangeText={setPublisher} />
               <Button icon={Send} variant="primary" label="Publish update" onPress={publish} />
@@ -290,10 +294,10 @@ export default function Settings() {
           <View>
             <SectionTitle>Data</SectionTitle>
             <Card>
-              <Row icon={<SlidersHorizontal size={17} color={c.ink2} />} label="Containers & departments" onPress={() => router.push('/lookups')} />
-              <Row icon={<Upload size={17} color={c.ink2} />} label="Import CSV" onPress={importFile} />
-              <Row icon={<Download size={17} color={c.ink2} />} label="Export CSV" onPress={exportCsv} />
-              <Row icon={<RefreshCcw size={17} color={c.danger} />} label="Reset tests to sample data" danger onPress={reset} last />
+              <Row icon={<SlidersHorizontal size={17} color={c.ink2} />} label="Containers & departments" hint="Tube colours, order of draw and departments used on test cards." onPress={() => router.push('/lookups')} />
+              <Row icon={<Download size={17} color={c.ink2} />} label="Export CSV" hint="Saves every test as a spreadsheet (Excel / Google Sheets) — a backup, or to edit many tests at once." onPress={exportCsv} />
+              <Row icon={<Upload size={17} color={c.ink2} />} label="Import CSV" hint="Reads that spreadsheet back: an existing code updates that test, a new code adds a test. Nothing is deleted. Publish afterwards so other phones get it." onPress={importFile} />
+              <Row icon={<RefreshCcw size={17} color={c.danger} />} label="Reset tests to sample data" hint="Replaces every test on this phone with the built-in examples (staff and sample logs are kept). For training or starting over — export a CSV first." danger onPress={reset} last />
             </Card>
           </View>
         </>
@@ -339,12 +343,15 @@ export default function Settings() {
   )
 }
 
-function Row({ icon, label, detail, onPress, danger, last }: { icon: ReactNode; label: string; detail?: string; onPress: () => void; danger?: boolean; last?: boolean }) {
+function Row({ icon, label, detail, hint, onPress, danger, last }: { icon: ReactNode; label: string; detail?: string; hint?: string; onPress: () => void; danger?: boolean; last?: boolean }) {
   const { c } = useTheme()
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.line }, pressed && { backgroundColor: c.surface3 }]}>
       {icon}
-      <Text style={{ flex: 1, fontFamily: font.bodySemi, fontSize: 15, color: danger ? c.danger : c.ink }}>{label}</Text>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ fontFamily: font.bodySemi, fontSize: 15, color: danger ? c.danger : c.ink }}>{label}</Text>
+        {hint ? <Text style={{ fontFamily: font.body, fontSize: 12.5, lineHeight: 17, color: c.muted }}>{hint}</Text> : null}
+      </View>
       {detail ? <Text style={{ fontFamily: font.body, fontSize: 13, color: c.muted }}>{detail}</Text> : null}
       <ChevronRight size={17} color={c.muted} />
     </Pressable>
