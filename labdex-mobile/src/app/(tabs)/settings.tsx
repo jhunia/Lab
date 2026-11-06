@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Haptics from 'expo-haptics'
-import { BookOpen, CheckCircle2, ChevronRight, KeyRound, ShieldCheck, Cloud, CloudOff, Download, FileUp, Monitor, Moon, RefreshCcw, RefreshCw, Send, SlidersHorizontal, Sun, Upload, UsersRound } from 'lucide-react-native'
+import { BookOpen, CheckCircle2, ChevronRight, ShieldCheck, Cloud, CloudOff, Download, FileUp, Monitor, Moon, RefreshCcw, RefreshCw, Send, SlidersHorizontal, Sun, Upload, UsersRound } from 'lucide-react-native'
 import { importCsv, toCsv } from '@shared/csv'
 import { relTime } from '@shared/helpers'
 import { BUILT_IN_CLOUD } from '@shared/cloud-config'
@@ -164,25 +164,16 @@ export default function Settings() {
                 <View style={{ gap: 3 }}>
                   <Text style={{ fontFamily: font.bodySemi, fontSize: 13.5, color: c.danger }}>Can’t reach the cloud right now</Text>
                   <Text style={{ fontFamily: font.body, fontSize: 13, lineHeight: 18, color: c.ink2 }}>
-                    Keep working — entries are saved on this phone and upload by themselves when the connection is back.
+                    Keep working — LabDex uses the tests already on this phone and catches up by itself when the connection is back.
                   </Text>
                   <Text style={{ fontFamily: font.mono, fontSize: 11, color: c.muted }}>{cloud.error}</Text>
                 </View>
               ) : (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <CheckCircle2 size={14} color={c.success} />
-                  <Text style={{ fontFamily: font.body, fontSize: 13, color: c.ink2 }}>Staff, sample logs and test updates are shared. Syncs every minute.</Text>
+                  <Text style={{ fontFamily: font.body, fontSize: 13, color: c.ink2 }}>Tests and the staff list stay up to date by themselves.</Text>
                 </View>
               )}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: font.bodySemi, fontSize: 14, color: c.ink }}>Sync automatically</Text>
-                  <Text style={{ fontFamily: font.body, fontSize: 12.5, lineHeight: 17, color: c.muted }}>
-                    {d.autoSync ? 'Entries upload as soon as you save and every minute.' : 'Entries stay on this phone until you tap Sync on the Register.'}
-                  </Text>
-                </View>
-                <Switch value={d.autoSync} onValueChange={d.setAutoSync} trackColor={{ true: c.ink, false: c.lineStrong }} thumbColor={c.surface} accessibilityLabel="Sync automatically" />
-              </View>
               <Button small icon={RefreshCw} label="Sync now" onPress={() => void d.teamSync().catch(() => {})} />
               {!onLabCloud && <Button small icon={Cloud} label={connecting ? 'Connecting…' : 'Switch back to the lab cloud'} disabled={connecting} onPress={reconnect} />}
               {senior.on && (
@@ -194,7 +185,7 @@ export default function Settings() {
           ) : (
             <>
               <Text style={{ fontFamily: font.body, fontSize: 13.5, lineHeight: 19, color: c.ink2 }}>
-                This phone isn’t sharing with the team. Sample logs stay on this phone until you reconnect.
+                This phone won’t get test updates or staff changes until it reconnects.
               </Text>
               <Button icon={Cloud} variant="primary" label={connecting ? 'Connecting…' : 'Reconnect to the lab cloud'} disabled={connecting} onPress={reconnect} />
             </>
@@ -223,7 +214,7 @@ export default function Settings() {
           <SectionTitle>Test updates</SectionTitle>
           <Card style={{ padding: 14, gap: 12 }}>
             {cloud.connected ? (
-              <Text style={{ fontFamily: font.body, fontSize: 13.5, lineHeight: 19, color: c.ink2 }}>Published test changes arrive from the cloud automatically — you’ll get “Update available” and a notification.</Text>
+              <Text style={{ fontFamily: font.body, fontSize: 13.5, lineHeight: 19, color: c.ink2 }}>Published test changes are applied by themselves within a minute.</Text>
             ) : (
               senior.on && (
                 <>
@@ -297,19 +288,18 @@ export default function Settings() {
               <Row icon={<SlidersHorizontal size={17} color={c.ink2} />} label="Containers & departments" hint="Tube colours, order of draw and departments used on test cards." onPress={() => router.push('/lookups')} />
               <Row icon={<Download size={17} color={c.ink2} />} label="Export CSV" hint="Saves every test as a spreadsheet (Excel / Google Sheets) — a backup, or to edit many tests at once." onPress={exportCsv} />
               <Row icon={<Upload size={17} color={c.ink2} />} label="Import CSV" hint="Reads that spreadsheet back: an existing code updates that test, a new code adds a test. Nothing is deleted. Publish afterwards so other phones get it." onPress={importFile} />
-              <Row icon={<RefreshCcw size={17} color={c.danger} />} label="Reset tests to sample data" hint="Replaces every test on this phone with the built-in examples (staff and sample logs are kept). For training or starting over — export a CSV first." danger onPress={reset} last />
+              <Row icon={<RefreshCcw size={17} color={c.danger} />} label="Reset tests to sample data" hint="Replaces every test on this phone with the built-in examples (the staff list is kept). For training only — while connected, the lab’s published tests come back within a minute." danger onPress={reset} last />
             </Card>
           </View>
         </>
-      ) : (
-        <View>
-          <SectionTitle>You</SectionTitle>
-          <Card>
-            <Row icon={<KeyRound size={17} color={c.ink2} />} label="Change my PIN" onPress={() => router.push('/staff')} />
+      ) : null}
+
+      <View>
+        <SectionTitle>Help</SectionTitle>
+        <Card>
           <Row icon={<BookOpen size={17} color={c.ink2} />} label="How LabDex works" onPress={() => router.push('/welcome')} last />
-          </Card>
-        </View>
-      )}
+        </Card>
+      </View>
 
       <View>
         <SectionTitle>Appearance</SectionTitle>

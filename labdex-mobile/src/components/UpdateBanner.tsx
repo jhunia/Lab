@@ -6,11 +6,20 @@ import { errMsg, useData } from '@/lib/data'
 import { font, useTheme } from '@/lib/theme'
 import { Button } from './ui'
 
-/** "Update available — Sync now", shown on the main screens when a newer update is published. */
+/**
+ * Published updates apply by themselves; this banner stays only on a phone holding unpublished test edits
+ * (a Senior mid-edit), because applying the update would replace those edits.
+ */
 export function UpdateBanner() {
   const { c } = useTheme()
   const { update, syncNow, dismissUpdate } = useData()
   if (!update?.available) return null
+
+  const apply = () =>
+    Alert.alert('Apply the new update?', 'Test edits on this phone that you haven’t published will be replaced. To keep them, publish first (Settings → Publish update).', [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Apply', style: 'destructive', onPress: () => void sync() }
+    ])
 
   const sync = async () => {
     try {
@@ -29,10 +38,10 @@ export function UpdateBanner() {
         <Text style={{ fontFamily: font.bodySemi, fontSize: 14.5, color: c.ink }}>Update available</Text>
         <Text style={{ fontFamily: font.body, fontSize: 12.5, color: c.ink2 }}>
           {update.publishedBy}
-          {update.publishedAt ? ` · ${relTime(update.publishedAt)}` : ''}
+          {update.publishedAt ? ` · ${relTime(update.publishedAt)}` : ''} · you have unpublished edits
         </Text>
       </View>
-      <Button small variant="primary" label="Sync now" onPress={sync} />
+      <Button small variant="primary" label="Apply" onPress={apply} />
       <Pressable onPress={dismissUpdate} hitSlop={10} accessibilityLabel="Later">
         <X size={17} color={c.muted} />
       </Pressable>

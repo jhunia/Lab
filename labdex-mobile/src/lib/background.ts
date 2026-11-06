@@ -43,7 +43,7 @@ export async function notifyUpdate(revision: number, publishedBy: string): Promi
   if (already >= revision) return
   await AsyncStorage.setItem(NOTIFIED_KEY, String(revision))
   await Notifications.scheduleNotificationAsync({
-    content: { title: 'LabDex update available', body: `${publishedBy} published new test information. Open LabDex and tap Sync now.` },
+    content: { title: 'LabDex update available', body: `${publishedBy} published new test information. Open LabDex to get it.` },
     trigger: null
   })
 }

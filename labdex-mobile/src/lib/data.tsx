@@ -74,9 +74,6 @@ interface DataCtx extends Snapshot {
   setCloud: (cfg: { url: string; anonKey: string } | null) => Promise<{ staff: number }>
   /** Sends this phone's sample-log entries and brings the team's down (staff list too). */
   teamSync: (opts?: { logs: boolean }) => Promise<SyncSummary | null>
-  /** Sample log syncs by itself (on by default). Off = only when someone taps Sync. */
-  autoSync: boolean
-  setAutoSync: (on: boolean) => void
   // Sample log
   logs: LogView[]
   waitingUpload: number
@@ -424,16 +421,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [refresh]
   )
 
-  const autoSync = sync.autoSync !== false
-  /** Every minute, on open and after each entry: the staff list always; the sample log only when auto-sync is on. */
-  const backgroundSync = useCallback(() => void teamSync({ logs: syncRef.current.autoSync !== false }).catch(() => {}), [teamSync])
-  const setAutoSync = useCallback(
-    (on: boolean) => {
-      saveSync({ ...syncRef.current, autoSync: on })
-      if (on) void teamSync({ logs: true }).catch(() => {})
-    },
-    [saveSync, teamSync]
-  )
+  /**
+   * Runs every minute and when the app opens: refreshes the staff list, and uploads any sample-log
+   * entries still queued from older versions of the app (the mobile Register has been removed).
+   */
+  const backgroundSync = useCallback(() => void teamSync({ logs: (logsRef.current?.outbox().length ?? 0) > 0 }).catch(() => {}), [teamSync])
 
   const setCloud = useCallback(
     async (cfg: { url: string; anonKey: string } | null) => {
@@ -465,20 +457,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Check when the app opens, every minute/few minutes while open, and when it returns to the foreground.
   useEffect(() => {
     if (!ready) return
+    // Published test changes apply by themselves — except on a phone holding test edits that haven't
+    // been published yet (a Senior mid-edit), where applying would wipe them; that phone keeps the banner.
+    const autoUpdate = async () => {
+      if (!cloudRef.current && !syncRef.current.feedUrl) return
+      const check = await checkUpdate()
+      if (check.available && !coreRef.current?.hasUnpublishedEdits()) await syncNow().catch(() => {})
+    }
     const run = () => {
       backgroundSync()
-      if (cloudRef.current || syncRef.current.feedUrl) void checkUpdate()
+      void autoUpdate()
     }
     run()
     const team = setInterval(backgroundSync, TEAM_SYNC_MS)
-    const upd = setInterval(() => (cloudRef.current || syncRef.current.feedUrl) && void checkUpdate(), CHECK_INTERVAL_MS)
+    // The cloud check is one tiny request, so it runs every minute; an update-file link is checked less often.
+    const upd = setInterval(() => void autoUpdate(), cloudRef.current ? TEAM_SYNC_MS : CHECK_INTERVAL_MS)
     const sub = AppState.addEventListener('change', (st) => st === 'active' && run())
     return () => {
       clearInterval(team)
       clearInterval(upd)
       sub.remove()
     }
-  }, [ready, sync.cloudUrl, sync.feedUrl, backgroundSync, checkUpdate])
+  }, [ready, sync.cloudUrl, sync.feedUrl, backgroundSync, checkUpdate, syncNow])
 
   // ---------- Sample log ----------
 
@@ -549,8 +549,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setCloud,
       reconnectLabCloud,
       teamSync,
-      autoSync,
-      setAutoSync,
       createLog,
       addLogEvent,
       reconfirmUpload
@@ -579,8 +577,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setCloud,
     reconnectLabCloud,
     teamSync,
-    autoSync,
-    setAutoSync,
     createLog,
     addLogEvent,
     reconfirmUpload

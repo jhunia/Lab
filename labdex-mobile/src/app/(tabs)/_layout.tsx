@@ -1,14 +1,13 @@
 import { Tabs } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { NotebookPen, Library, Settings2, TestTubes } from 'lucide-react-native'
+import { Library, Settings2, TestTubes } from 'lucide-react-native'
 import { useData } from '@/lib/data'
 import { font, useTheme } from '@/lib/theme'
 
 export default function TabsLayout() {
   const { c } = useTheme()
   const insets = useSafeAreaInsets()
-  const { update, logs, needsPin, staff, cloud } = useData()
-  const open = logs.filter((v) => v.open).length
+  const { update, staff, cloud } = useData()
   return (
     <Tabs
       screenOptions={{
@@ -24,15 +23,6 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Directory', tabBarIcon: ({ color, size }) => <Library color={color} size={size - 2} /> }} />
-      <Tabs.Screen
-        name="log"
-        options={{
-          title: 'Register',
-          tabBarBadge: needsPin.length ? '!' : open || undefined,
-          tabBarBadgeStyle: { backgroundColor: needsPin.length ? c.amber : c.accent, color: c.accentInk },
-          tabBarIcon: ({ color, size }) => <NotebookPen color={color} size={size - 2} />
-        }}
-      />
       <Tabs.Screen name="planner" options={{ title: 'Planner', tabBarIcon: ({ color, size }) => <TestTubes color={color} size={size - 2} /> }} />
       <Tabs.Screen
         name="settings"

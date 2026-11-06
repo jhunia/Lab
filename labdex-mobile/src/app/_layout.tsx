@@ -55,9 +55,6 @@ function Navigator() {
         <Stack.Screen name="test/edit" options={{ presentation: 'modal', title: 'Test' }} />
         <Stack.Screen name="lookups" options={{ title: 'Containers & departments' }} />
         <Stack.Screen name="staff" options={{ title: 'Staff' }} />
-        <Stack.Screen name="log/new" options={{ presentation: 'modal', title: 'Log a sample' }} />
-        <Stack.Screen name="log/[id]" options={{ title: '' }} />
-        <Stack.Screen name="log/scan" options={{ presentation: 'fullScreenModal', headerShown: false }} />
         <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false }} />
       </Stack>
     </WebFrame>

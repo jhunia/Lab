@@ -20,6 +20,8 @@ export interface DbFile {
   history: HistoryEntry[]
   /** Staff list. In cloud mode this is a cache of the cloud list (without PIN data). */
   staff: Staff[]
+  /** When tests, containers or departments were last changed on this device (ms; 0 = never). */
+  editedAt?: number
 }
 
 /** The update file an editor publishes and every other device syncs from. */
@@ -74,7 +76,8 @@ export function migrateDb(raw: unknown): DbFile {
     containers: d.containers ?? clone(seedContainers),
     departments: d.departments ?? clone(seedDepartments),
     history: (d.history ?? []).map(migrateHistory),
-    staff: d.staff ?? []
+    staff: d.staff ?? [],
+    editedAt: d.editedAt ?? 0
   }
   // Keyed on its own marker (not the schema version) so it still runs if an earlier
   // upgrade converted the format without adding these.
@@ -234,6 +237,20 @@ export class LabCore {
     this.save()
   }
 
+  /**
+   * True when tests, containers or departments were changed here after the last publish or applied
+   * update — applying a newer update would replace those changes, so it must not happen silently.
+   */
+  hasUnpublishedEdits(): boolean {
+    return (this.db.editedAt ?? 0) > this.db.revision
+  }
+
+  /** Records a local change to the directory and saves. */
+  private edited(): void {
+    this.db.editedAt = Date.now()
+    this.save()
+  }
+
   /** Builds the update file and stamps this database with its revision. */
   exportPackage(publishedBy: string): UpdatePackage {
     const revision = Math.max(Date.now(), this.db.revision + 1)
@@ -258,7 +275,7 @@ export class LabCore {
   applyPackage(pkg: UpdatePackage): { revision: number; tests: number } {
     // A published update is already complete — never add built-in tests the editor removed.
     const next = migrateDb({ ...pkg, schemaVersion: 2, seedLevel: SEED_LEVEL })
-    this.db = { ...next, revision: pkg.revision, editorPinHash: pkg.editorPinHash ?? '', seedLevel: SEED_LEVEL, staff: pkg.staff ?? this.db.staff }
+    this.db = { ...next, revision: pkg.revision, editorPinHash: pkg.editorPinHash ?? '', seedLevel: SEED_LEVEL, staff: pkg.staff ?? this.db.staff, editedAt: 0 }
     this.save()
     return { revision: pkg.revision, tests: this.db.tests.length }
   }
@@ -282,13 +299,13 @@ export class LabCore {
       if (changes.length === 0) return prev
       this.db.tests = this.db.tests.map((t) => (t.id === prev.id ? next : t))
       this.record(next, action, changes)
-      this.save()
+      this.edited()
       return next
     }
     const created: LabTest = { ...clean, id: uid(), version: 1, createdAt: now, updatedAt: now }
     this.db.tests.push(created)
     this.record(created, action === 'imported' ? 'imported' : 'created', [])
-    this.save()
+    this.edited()
     return created
   }
 
@@ -297,7 +314,7 @@ export class LabCore {
     const next: LabTest = { ...prev, status, version: prev.version + 1, updatedAt: new Date().toISOString() }
     this.db.tests = this.db.tests.map((t) => (t.id === id ? next : t))
     this.record(next, action, ['Status'])
-    this.save()
+    this.edited()
     return next
   }
 
@@ -315,7 +332,7 @@ export class LabCore {
     if (t.status !== 'ARCHIVED') throw new Error('Archive the test before deleting it permanently')
     this.db.tests = this.db.tests.filter((x) => x.id !== id)
     this.db.history = this.db.history.filter((h) => h.testId !== id)
-    this.save()
+    this.edited()
   }
 
   history(testId: string): HistoryEntry[] {
@@ -334,7 +351,7 @@ export class LabCore {
     const item = { ...c, id: c.id || uid(), name: c.name.trim() }
     const exists = this.db.containers.some((x) => x.id === item.id)
     this.db.containers = exists ? this.db.containers.map((x) => (x.id === item.id ? item : x)) : [...this.db.containers, item]
-    this.save()
+    this.edited()
     return item
   }
 
@@ -342,7 +359,7 @@ export class LabCore {
     const used = this.db.tests.filter((t) => t.specimens.some((s) => s.containerId === id)).length
     if (used) throw new Error(`Container is used by ${used} test${used > 1 ? 's' : ''}`)
     this.db.containers = this.db.containers.filter((x) => x.id !== id)
-    this.save()
+    this.edited()
   }
 
   saveDepartment(d: Department): Department {
@@ -350,7 +367,7 @@ export class LabCore {
     const item = { ...d, id: d.id || uid(), name: d.name.trim() }
     const exists = this.db.departments.some((x) => x.id === item.id)
     this.db.departments = exists ? this.db.departments.map((x) => (x.id === item.id ? item : x)) : [...this.db.departments, item]
-    this.save()
+    this.edited()
     return item
   }
 
@@ -358,6 +375,6 @@ export class LabCore {
     const used = this.db.tests.filter((t) => t.departmentId === id).length
     if (used) throw new Error(`Department is used by ${used} test${used > 1 ? 's' : ''}`)
     this.db.departments = this.db.departments.filter((x) => x.id !== id)
-    this.save()
+    this.edited()
   }
 }

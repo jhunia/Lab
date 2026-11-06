@@ -2,10 +2,9 @@ import { useRef, useState, type ReactNode } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
 import { Stack, router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Barcode, CloudCheck, KeyRound, Library, Lock, NotebookPen, Plus, Search, WifiOff } from 'lucide-react-native'
+import { CheckSquare, CloudCheck, Library, ListOrdered, Search, TestTubes, WifiOff } from 'lucide-react-native'
 import { font, useTheme } from '@/lib/theme'
 import { tap } from '@/components/ui'
-import { Stamp } from '@/components/Logbook'
 import { markWelcomed } from '@/lib/welcome'
 
 interface Card {
@@ -15,7 +14,7 @@ interface Card {
   demo: ReactNode
 }
 
-/** A short, one-time walkthrough of how the app is used at the bench. Reopen it from Settings. */
+/** A short, one-time walkthrough of what the app does. Reopen it from Settings. */
 export default function Welcome() {
   const { c } = useTheme()
   const insets = useSafeAreaInsets()
@@ -51,64 +50,42 @@ export default function Welcome() {
       )
     },
     {
-      icon: <NotebookPen size={26} color={c.ink} />,
-      title: 'Log every sample',
-      body: 'In the Register, tap LOG SAMPLE (or scan the barcode) as a sample arrives, and add an update as it moves along. Only the lab number is written down — never the patient’s name.',
+      icon: <TestTubes size={26} color={c.ink} />,
+      title: 'Plan a collection',
+      body: 'In the Planner, tick the tests ordered for a patient. LabDex works out which tubes to fill, how many, and the order of draw.',
       demo: (
         <View style={{ gap: 8 }}>
-          <View style={[styles.row, { borderColor: c.line, backgroundColor: c.surface }]}>
-            <Text style={{ fontFamily: font.display, fontSize: 20, color: c.ink, flex: 1 }}>L-2026-0042</Text>
-            <Stamp status="IN_PROGRESS" />
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={[styles.fakeBtn, { backgroundColor: c.ink, flex: 1 }]}>
-              <Plus size={16} color={c.bg} />
-              <Text style={{ fontFamily: font.display, fontSize: 16, letterSpacing: 1, color: c.bg }}>LOG SAMPLE</Text>
-            </View>
-            <View style={[styles.fakeBtn, { borderWidth: 2, borderColor: c.ink, width: 46 }]}>
-              <Barcode size={18} color={c.ink} />
-            </View>
-          </View>
-        </View>
-      )
-    },
-    {
-      icon: <KeyRound size={26} color={c.ink} />,
-      title: 'Sign with your PIN',
-      body: 'No accounts or passwords. Tap your name and enter your PIN, so every entry shows who did it. The phone remembers you for 5 minutes — tap the lock before you hand it to someone else.',
-      demo: (
-        <View style={{ alignItems: 'center', gap: 10 }}>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            {[0, 1, 2, 3].map((i) => (
-              <View key={i} style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: i < 3 ? c.ink : 'transparent', borderWidth: 1.5, borderColor: c.ink }} />
-            ))}
-          </View>
           {chip(
             <>
-              <Lock size={13} color={c.ink2} />
-              {small('Ama · Lab tech')}
-            </>,
-            { borderRadius: 14 }
+              <CheckSquare size={15} color={c.ink} />
+              {small('FBC  ·  U&E  ·  Fasting glucose', c.ink)}
+            </>
+          )}
+          {chip(
+            <>
+              <ListOrdered size={15} color={c.ink2} />
+              {small('1 lavender  →  2 gold  →  3 grey')}
+            </>
           )}
         </View>
       )
     },
     {
       icon: <CloudCheck size={26} color={c.ink} />,
-      title: 'Hand over to the next shift',
-      body: 'Entries save on your phone first, so no signal is fine. They sync with the team by themselves; tap Sync to send them straight away. The next shift opens the Register and sees what is waiting, late or done.',
+      title: 'Always up to date',
+      body: 'Everything syncs by itself. When a Senior changes a test, every phone gets the new version automatically — nothing to tap. No signal? LabDex keeps working and catches up when it’s back.',
       demo: (
         <View style={{ gap: 8 }}>
           {chip(
             <>
-              <WifiOff size={14} color={c.amber} />
-              {small('2 entries only on this phone — sending automatically', c.amber)}
+              <WifiOff size={14} color={c.muted} />
+              {small('Offline — using the tests on this phone', c.muted)}
             </>
           )}
           {chip(
             <>
               <CloudCheck size={14} color={c.success} />
-              {small('All synced · just now')}
+              {small('Tests updated by Kofi · just now')}
             </>
           )}
         </View>
@@ -121,7 +98,7 @@ export default function Welcome() {
     tap()
     void markWelcomed()
     if (router.canGoBack()) router.back()
-    else router.replace('/log')
+    else router.replace('/')
   }
   const next = () => {
     tap()
@@ -181,7 +158,5 @@ export default function Welcome() {
 const styles = StyleSheet.create({
   demo: { borderWidth: 1, borderRadius: 6, padding: 16, minHeight: 150, justifyContent: 'center' },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 10 },
-  row: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 4, padding: 12 },
-  fakeBtn: { height: 46, borderRadius: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   next: { height: 54, borderRadius: 6, alignItems: 'center', justifyContent: 'center' }
 })
