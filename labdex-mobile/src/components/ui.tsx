@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native'
+import { Platform, Pressable, type StyleProp, StyleSheet, Text, TextInput, type TextInputProps, type TextStyle, View, type ViewStyle } from 'react-native'
 import * as Haptics from 'expo-haptics'
 import type { LucideIcon } from 'lucide-react-native'
 import { font, useTheme } from '@/lib/theme'
 
 export const tap = () => Haptics.selectionAsync().catch(() => {})
+
+/** Side margin for custom header buttons: phones' native headers already inset them; the web header doesn't. */
+export const HEADER_SIDE = Platform.OS === 'web' ? 16 : 0
 
 export function Eyebrow({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {
   const { c } = useTheme()

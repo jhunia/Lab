@@ -12,7 +12,7 @@ import { font, useTheme } from '@/lib/theme'
 import { TestCard } from '@/components/TestCard'
 import { TubeIcon } from '@/components/Visuals'
 import { ListEditor } from '@/components/ListEditor'
-import { Chip, Field, Input, Segmented, tap } from '@/components/ui'
+import { Chip, Field, Input, Segmented, tap, HEADER_SIDE } from '@/components/ui'
 import { useRequireStaff } from '@/lib/identity'
 
 const SAMPLE_TYPES = ['Whole blood', 'Serum', 'EDTA plasma', 'Citrated plasma', 'Heparin plasma', 'Fluoride plasma', 'Midstream urine', '24 h urine', 'Swab', 'CSF', 'Stool', 'Tissue', 'Cervical cells (liquid-based)', 'Cervical smear (conventional)']
@@ -91,12 +91,12 @@ export default function EditTest() {
           title: id ? 'Edit test' : 'New test',
           gestureEnabled: !dirty,
           headerLeft: () => (
-            <Pressable onPress={cancel} hitSlop={10} style={{ paddingRight: 16 }}>
+            <Pressable onPress={cancel} hitSlop={10} style={{ paddingLeft: HEADER_SIDE, paddingRight: 16 }}>
               <Text style={{ fontFamily: font.body, fontSize: 16, color: c.ink2 }}>Cancel</Text>
             </Pressable>
           ),
           headerRight: () => (
-            <Pressable onPress={save} hitSlop={10}>
+            <Pressable onPress={save} hitSlop={10} style={{ paddingRight: HEADER_SIDE }}>
               <Text style={{ fontFamily: font.bodySemi, fontSize: 16, color: c.accent }}>{id ? 'Save' : 'Create'}</Text>
             </Pressable>
           )

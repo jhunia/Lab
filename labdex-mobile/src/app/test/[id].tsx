@@ -11,7 +11,7 @@ import { useSeniorMode } from '@/lib/senior'
 import { errMsg, useData } from '@/lib/data'
 import { font, useTheme } from '@/lib/theme'
 import { Barcode, ContainerChip, StorageBadge, TatBar, TubeIcon, TubeStack } from '@/components/Visuals'
-import { Button, Card, Input, SectionTitle, Segmented, StatusPill } from '@/components/ui'
+import { Button, Card, Input, SectionTitle, Segmented, StatusPill, HEADER_SIDE } from '@/components/ui'
 
 const ACTION_LABEL: Record<HistoryEntry['action'], string> = {
   created: 'Created',
@@ -83,7 +83,7 @@ export default function TestDetail() {
           headerTitleStyle: { fontFamily: font.monoSemi, color: c.ink, fontSize: 15 },
           headerRight: () =>
             !canEdit || archived ? null : (
-              <Pressable onPress={goEdit} hitSlop={10} accessibilityLabel="Edit">
+              <Pressable onPress={goEdit} hitSlop={10} accessibilityLabel="Edit" style={{ paddingRight: HEADER_SIDE }}>
                 <Text style={{ fontFamily: font.bodySemi, fontSize: 16, color: c.accent }}>Edit</Text>
               </Pressable>
             )
