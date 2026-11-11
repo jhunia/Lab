@@ -19,7 +19,7 @@ import { CloudClient, cloudConfigError } from '@shared/cloud'
 import { BUILT_IN_CLOUD, withBuiltInCloud } from '@shared/cloud-config'
 import { LogCore, emptyLogFile, type LogFile, type SampleStatus } from '@shared/logs'
 import { PinThrottle, SESSION_MS, hasRole, type StaffInput, type StaffRole, type StaffSession } from '@shared/staff'
-import { identify, pullLogs, pushOutbox, sessionValid } from '@shared/teamsync'
+import { identify, pushOutbox, sessionValid } from '@shared/teamsync'
 import { openStore, writeJsonAtomic } from './store'
 
 let win: BrowserWindow | null = null
@@ -116,13 +116,23 @@ async function teamSync(): Promise<void> {
   syncing = true
   try {
     store.replaceStaff(await cloud.listStaff())
-    await pushOutbox(cloud, logs)
-    await pullLogs(cloud, logs)
+    // The sample log was retired; only entries still queued from older versions are sent.
+    if (logs.outbox().length) await pushOutbox(cloud, logs)
     const rel = await cloud.latestRelease()
     const local = Math.max(sync.syncedRevision, store.snapshot().revision)
-    if (rel && rel.revision > local && rel.revision > lastNotifiedRevision) {
-      lastNotifiedRevision = rel.revision
-      if (Notification.isSupported()) new Notification({ title: 'LabDex update available', body: `${rel.publisherName} published new test information. Open LabDex and click Sync now.` }).show()
+    if (rel && rel.revision > local) {
+      if (!store.hasUnpublishedEdits()) {
+        // Published test changes apply by themselves, as on the phones.
+        const result = store.applyPackage(await cloud.fetchRelease(rel.revision))
+        sync = { ...sync, syncedRevision: result.revision }
+        saveSync()
+        pendingPackage = null
+        if (Notification.isSupported()) new Notification({ title: 'LabDex tests updated', body: `${rel.publisherName} published new test information (${result.tests} tests).` }).show()
+      } else if (rel.revision > lastNotifiedRevision) {
+        // This computer has test edits that were never published; applying would replace them, so ask instead.
+        lastNotifiedRevision = rel.revision
+        if (Notification.isSupported()) new Notification({ title: 'LabDex update available', body: `${rel.publisherName} published new tests, but this computer has unpublished edits. Open Settings to choose.` }).show()
+      }
     }
     cloudStatus = { connected: true, lastSyncAt: new Date().toISOString(), error: '' }
   } catch (e) {

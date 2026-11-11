@@ -15,12 +15,11 @@ import {
   Sun,
   TestTubes,
   Upload,
-  ClipboardList,
   Lock,
   UsersRound,
   Zap
 } from 'lucide-react'
-import { primarySpecimen, type LabTest, type LogState, type Snapshot, type SyncCheck, type TestInput } from '@shared/types'
+import { primarySpecimen, type LabTest, type Snapshot, type SyncCheck, type TestInput } from '@shared/types'
 import { ROLE_LABEL } from '@shared/staff'
 import { CHECK_INTERVAL_MS } from '@shared/sync'
 import { api, blankTest, cx, duplicateInput, errMsg, makeLookups, relTime, toInput } from './lib/util'
@@ -33,12 +32,11 @@ import { CatalogView } from './views/CatalogView'
 import { PlannerView } from './views/PlannerView'
 import { LookupsView } from './views/LookupsView'
 import { SettingsView } from './views/SettingsView'
-import { SampleLogView } from './views/SampleLogView'
 import { StaffView } from './views/StaffView'
 import { IdentityProvider, isCancel, type RequireStaff } from './components/Identity'
 import { StorageBadge } from './components/Visuals'
 
-type View = 'directory' | 'planner' | 'log' | 'staff' | 'lookups' | 'settings'
+type View = 'directory' | 'planner' | 'staff' | 'lookups' | 'settings'
 type Scope = 'active' | 'DRAFT' | 'ARCHIVED'
 type Theme = 'system' | 'light' | 'dark'
 
@@ -81,18 +79,15 @@ export function App() {
   const [theme, setTheme] = useState<Theme>(() => readPref<Theme>('labdex.theme', 'system'))
   const [update, setUpdate] = useState<SyncCheck | null>(null)
   const [checking, setChecking] = useState(false)
-  const [logState, setLogState] = useState<LogState>({ views: [], waitingUpload: 0, needsPin: [] })
   const searchRef = useRef<HTMLInputElement>(null)
   const requireRef = useRef<RequireStaff | null>(null)
 
   const reload = useCallback(async () => {
-    const [s, l] = await Promise.all([api.getAll(), api.getLogs()])
-    setSnap(s)
-    setLogState(l)
+    setSnap(await api.getAll())
   }, [])
   useEffect(() => {
     void reload()
-    // Background sync (new logs, staff, releases) tells us when to refresh.
+    // Background sync (staff, published releases) tells us when to refresh.
     return api.onChanged(() => void reload())
   }, [reload])
 
@@ -294,7 +289,6 @@ export function App() {
   const paletteActions: PaletteAction[] = [
     { id: 'new', label: 'New test', icon: Plus, hint: 'Ctrl N', run: () => void startNew() },
     { id: 'planner', label: 'Open collection planner', icon: TestTubes, run: () => setView('planner') },
-    { id: 'log', label: 'Sample log (handover)', icon: ClipboardList, run: () => setView('log') },
     { id: 'staff', label: 'Staff list', icon: UsersRound, run: () => setView('staff') },
     { id: 'lookups', label: 'Containers & departments', icon: SlidersHorizontal, run: () => setView('lookups') },
     { id: 'settings', label: 'Sync & settings', icon: Settings2, run: () => setView('settings') },
@@ -361,7 +355,6 @@ export function App() {
         <nav className="rail-nav">
           <RailItem icon={Library} label="Directory" active={view === 'directory' && scope === 'active' && !depFilter} count={counts.active} onClick={() => { setView('directory'); setScope('active'); setDepFilter(null) }} />
           <RailItem icon={TestTubes} label="Collection planner" active={view === 'planner'} count={plannerSel.length || undefined} onClick={() => setView('planner')} />
-          <RailItem icon={ClipboardList} label="Sample log" active={view === 'log'} count={logState.views.filter((v) => v.open).length || undefined} onClick={() => setView('log')} />
           <RailItem icon={UsersRound} label="Staff" active={view === 'staff'} dot={snap.staff.length === 0} onClick={() => setView('staff')} />
           <RailItem icon={SlidersHorizontal} label="Lookups" active={view === 'lookups'} onClick={() => setView('lookups')} />
           <RailItem icon={Settings2} label="Settings" active={view === 'settings'} dot={!!update?.available} onClick={() => setView('settings')} />
@@ -424,7 +417,7 @@ export function App() {
         </div>
       </aside>
 
-      <main className={cx('main', (view === 'directory' || view === 'log') && 'with-detail', update?.available && 'has-banner')}>
+      <main className={cx('main', view === 'directory' && 'with-detail', update?.available && 'has-banner')}>
         {update?.available && (
           <div className="update-banner">
             <RefreshCw size={15} />
@@ -475,7 +468,6 @@ export function App() {
           </>
         )}
         {view === 'planner' && <PlannerView tests={active.filter((t) => t.status === 'PUBLISHED')} lookups={lookups} selected={plannerSel} setSelected={setPlannerSel} />}
-        {view === 'log' && <SampleLogView snap={snap} lookups={lookups} state={logState} reload={reload} />}
         {view === 'staff' && <StaffView snap={snap} onChanged={reload} />}
         {view === 'lookups' && <LookupsView tests={tests} containers={snap.containers} departments={snap.departments} onChanged={reload} />}
         {view === 'settings' && (

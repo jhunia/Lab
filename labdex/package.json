@@ -1,7 +1,7 @@
 {
   "name": "labdex",
   "productName": "LabDex",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Lab test directory and specimen guide",
   "author": "LabDex",
   "main": "./out/main/index.js",

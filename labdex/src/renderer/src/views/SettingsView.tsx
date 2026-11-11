@@ -119,7 +119,7 @@ export function SettingsView({ snap, update, checking, onCheck, onSync, onChange
         {cloud.connected ? (
           <>
             <p className="muted">
-              The staff list, published tests and the sample log are shared through <span className="mono">{sync.cloudUrl.replace('https://', '')}</span>. LabDex syncs every minute and whenever the window is focused.
+              The staff list and published tests are shared through <span className="mono">{sync.cloudUrl.replace('https://', '')}</span>. LabDex syncs every minute and whenever the window is focused.
             </p>
             <div className="sync-status">
               <span>Key {sync.cloudKey}</span>
@@ -137,7 +137,7 @@ export function SettingsView({ snap, update, checking, onCheck, onSync, onChange
           </>
         ) : (
           <>
-            <p className="muted">This computer isn’t sharing with the team. Sample logs stay here until you reconnect.</p>
+            <p className="muted">This computer won’t get test updates or staff changes until it reconnects.</p>
             <div className="set-row">
               <button className="btn btn-primary" disabled={connecting} onClick={reconnect}>
                 <Cloud size={14} /> {connecting ? 'Connecting…' : 'Reconnect to the lab cloud'}
@@ -182,7 +182,7 @@ export function SettingsView({ snap, update, checking, onCheck, onSync, onChange
           {update?.available && <span className="update-dot">Update available</span>}
         </header>
         {cloud.connected ? (
-          <p className="muted">Published updates come from the cloud automatically. You’ll see “Update available” and a notification.</p>
+          <p className="muted">Published test changes are applied by themselves within a minute.</p>
         ) : (
           <>
             <p className="muted">No cloud yet? Paste the share link of a published update file (OneDrive, Google Drive, Dropbox…).</p>
